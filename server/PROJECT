@@ -1,0 +1,19 @@
+domain: plockc.github.io
+layout:
+- go.kubebuilder.io/v4-alpha
+plugins:
+  manifests.sdk.operatorframework.io/v2: {}
+  scorecard.sdk.operatorframework.io/v2: {}
+projectName: server
+repo: github.com/plockc/disk8s
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: plockc.github.io
+  group: disk8s
+  kind: Disk
+  path: github.com/plockc/disk8s/api/v1alpha1
+  version: v1alpha1
+version: "3"
