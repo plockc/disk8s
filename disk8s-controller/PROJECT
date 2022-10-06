@@ -1,0 +1,16 @@
+domain: disk8s.plockc.org
+layout:
+- go.kubebuilder.io/v4-alpha
+projectName: disk8s-controller
+repo: github.com/plockc/disk8s/disk8s-controller
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: disk8s.plockc.org
+  group: disk8s
+  kind: Disk
+  path: github.com/plockc/disk8s/disk8s-controller/api/v1alpha1
+  version: v1alpha1
+version: "3"

@@ -1,6 +1,0 @@
-apiVersion: disk8s.plockc.github.io/v1alpha1
-kind: Disk
-metadata:
-  name: disk-sample
-spec:
-  # TODO(user): Add fields here
