@@ -5,9 +5,9 @@ Uses kubebuilder, which currently is 404 for M1 Mac using arkade, so download di
 ark install kubebuilder || (curl -L -o kubebuilder https://go.kubebuilder.io/dl/latest/$(go env GOOS)/$(go env GOARCH) && chmod 755 kubebuilder && mv kubebuilder /usr/local/bin)
 ```
 
-Create scaffolding
+Create scaffolding, I think the group gets added to the domain (domain with disk8s.plock.org causes disk8s.disk8s to appear)
 ```
-kubebuilder init  --plugins=go/v4-alpha --domain disk8s.plockc.org --repo github.com/plockc/disk8s/disk8s-controller
+kubebuilder init  --plugins=go/v4-alpha --domain plockc.org --repo github.com/plockc/disk8s/disk8s-controller
 kubebuilder create api --group disk8s --version v1alpha1 --kind Disk --resource --controller --plugins=go/v4-alpha
 ```
 
