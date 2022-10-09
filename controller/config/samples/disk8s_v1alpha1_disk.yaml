@@ -1,0 +1,12 @@
+apiVersion: disk8s.plockc.org/v1alpha1
+kind: Disk
+metadata:
+  labels:
+    app.kubernetes.io/name: disk
+    app.kubernetes.io/instance: disk-sample
+    app.kubernetes.io/part-of: controller
+    app.kuberentes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: controller
+  name: disk-sample
+spec:
+  # TODO(user): Add fields here
