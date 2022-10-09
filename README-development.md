@@ -85,6 +85,14 @@ Initialize devspace
 - run `devspace use namespace disk8s-system` so the runtime can find the namespaced service account
 - `devspace.yaml` dev.app.devImage is using go1.18, might consider a new image using that as base with go modules pulled and go1.19 installed instead
 - run `devspace dev` then can run main
+- add a persistent path to `devspace.yaml` dev.app to cache go module downloads:
+  ```
+  persistPaths:
+    - path: /go/pkg/mod/cache/download
+  ```
 
-Getting killed when compiling, possible memory limits
+The initial compile takes a long time and will likely get killed once or twice, but then it will be stable.
 
+Consider setting up [autoReload](https://www.devspace.sh/docs/5.x/configuration/development/auto-reloading) for the deployment.
+
+Also consider setting up a special devspace manifest with larger runtime memory and CPU limits.

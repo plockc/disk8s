@@ -36,8 +36,8 @@
         +readinessProbe.httpGet.withPath("/readyz")
         +readinessProbe.httpGet.withPort(8081)
         +resources.withRequests({cpu: "10m", memory: "128Mi"})
-        // need more memory to be able to compile in devspace
-        +resources.withLimits({cpu: "500m", memory: "512Mi"})
+        // need more memory to be able to compile in devspace, and want extra cpu
+        +resources.withLimits({cpu: "1000m", memory: "768Mi"})
         +securityContext.withAllowPrivilegeEscalation(false)
         +securityContext.capabilities.withDrop("ALL")
   },
