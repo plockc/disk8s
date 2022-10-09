@@ -1,6 +1,7 @@
 local k = import "k8s.libsonnet";
+local kustomized = import "kustomized.json";
 
-[{
+[r for r in kustomized if r.kind != "Deployment"] + [{
   _config:: {
     name: "disk8s-controller",
   },
@@ -16,4 +17,4 @@ local k = import "k8s.libsonnet";
     +deploy.spec.template.spec.withTerminationGracePeriodSeconds(10)
     +deploy.spec.template.spec.withServiceAccountName($._config.name+"-controller-manager")
   }
-}]
+}] 

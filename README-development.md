@@ -5,8 +5,10 @@ Uses kubebuilder, which currently is 404 for M1 Mac using arkade, so download di
 ark install kubebuilder || (curl -L -o kubebuilder https://go.kubebuilder.io/dl/latest/$(go env GOOS)/$(go env GOARCH) && chmod 755 kubebuilder && mv kubebuilder /usr/local/bin)
 ```
 
-Create scaffolding, I think the group gets added to the domain (domain with disk8s.plock.org causes disk8s.disk8s to appear)
+Create scaffolding.
 ```
+mkdir controller
+cd controller
 kubebuilder init  --plugins=go/v4-alpha --domain plockc.org --repo github.com/plockc/disk8s/disk8s-controller
 kubebuilder create api --group disk8s --version v1alpha1 --kind Disk --resource --controller --plugins=go/v4-alpha
 ```
@@ -14,6 +16,10 @@ kubebuilder create api --group disk8s --version v1alpha1 --kind Disk --resource 
 `Makefile` updates:
 - `IMG` to use image repository name disk8s-controller
 - PLATFORMS to drop `s390x` and `ppc64le` to save time for rare deployments when using build-dockerx, keeps raspi 64 support however
+
+`config/default/kustomize.yaml` change:
+- `namespace` should be set to project name `disk8s`
+- `namePrefix` should be set to project name with a dash: `disk8s-`
 
 Updated spec and status in api/<version>/disk_types.go
 
