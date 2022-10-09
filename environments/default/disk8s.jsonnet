@@ -12,7 +12,7 @@ local kustomized = import "kustomized.json";
   deployment: deploy.new(name="disk8s-controller", replicas=1, containers=[
     controllerContainer.new("manager", "plockc/"+$._config.name+":latest"),
   ])
-  +deploy.spec.template.spec.securityContext.withRunAsNonRoot(true)
+  //+deploy.spec.template.spec.securityContext.withRunAsNonRoot(true)
   +deploy.spec.template.spec.withTerminationGracePeriodSeconds(10)
-  +deploy.spec.template.spec.withServiceAccountName($._config.name+"-controller-manager")
+  +deploy.spec.template.spec.withServiceAccountName($._config.name+"-manager")
 }.deployment] 

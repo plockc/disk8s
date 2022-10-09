@@ -65,8 +65,26 @@ jb install github.com/jsonnet-libs/k8s-libsonnet/1.25@main
 jb install github.com/grafana/jsonnet-libs/ksonnet-util
 ```
 
-Run jsonnet
+Run Kustomize to get the kubebuilder manifests
+```
+
+```
+
+Run jsonnet to redo the deploy and drop service
 ```
 cd environments
-jsonnet --yaml-stream -J vendor -J lib default/main.jsonnet
+jsonnet --yaml-stream -J vendor -J lib default/disk8s.jsonnet  > default/disk8s.yaml
 ```
+
+Initialize devspace
+- run inside controller directory
+- point to ../environments/default/disk8s.yaml from the jsonnet output
+- choose develop container option
+- use the existing Dockerfile
+- no listening port
+- run `devspace use namespace disk8s-system` so the runtime can find the namespaced service account
+- `devspace.yaml` dev.app.devImage is using go1.18, might consider a new image using that as base with go modules pulled and go1.19 installed instead
+- run `devspace dev` then can run main
+
+Getting killed when compiling, possible memory limits
+

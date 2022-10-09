@@ -1,6 +1,6 @@
 module github.com/plockc/disk8s/disk8s-controller
 
-go 1.19
+go 1.18
 
 require (
 	github.com/onsi/ginkgo/v2 v2.1.4
