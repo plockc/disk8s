@@ -67,7 +67,8 @@ jb install github.com/grafana/jsonnet-libs/ksonnet-util
 
 Run Kustomize to get the kubebuilder manifests
 ```
-
+cd controller
+kustomize build config/default | gojq --yaml-input -s > ../environments/default/kustomized.json
 ```
 
 Run jsonnet to redo the deploy and drop service

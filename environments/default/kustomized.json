@@ -169,6 +169,23 @@
     "rules": [
       {
         "apiGroups": [
+          "apps"
+        ],
+        "resources": [
+          "deployments"
+        ],
+        "verbs": [
+          "create",
+          "delete",
+          "get",
+          "list",
+          "patch",
+          "update",
+          "watch"
+        ]
+      },
+      {
+        "apiGroups": [
           "disk8s.plockc.org"
         ],
         "resources": [

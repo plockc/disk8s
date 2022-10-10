@@ -18,8 +18,11 @@ package controllers
 
 import (
 	"context"
+	"os"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -36,6 +39,7 @@ type DiskReconciler struct {
 //+kubebuilder:rbac:groups=disk8s.plockc.org,resources=disks,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=disk8s.plockc.org,resources=disks/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=disk8s.plockc.org,resources=disks/finalizers,verbs=update
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -47,9 +51,27 @@ type DiskReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
 func (r *DiskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	l := log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	l.Info("reconciling")
+
+	var disk disk8sv1alpha1.Disk
+	if err := r.Get(ctx, req.NamespacedName, &disk); err != nil {
+		l.Error(err, "unable to fetch Disk")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	deployNamespacedName := types.NamespacedName{
+		Namespace: os.Getenv("K8S_POD_NAMESPACE"),
+		Name:      "replicated-disk-" + req.Name,
+	}
+	l.Info("NAMESSPACE is " + deployNamespacedName.Namespace)
+
+	var deploy appsv1.Deployment
+	if err := r.Get(ctx, deployNamespacedName, &deploy); err != nil {
+		l.Error(err, "unable to list child Pods")
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }

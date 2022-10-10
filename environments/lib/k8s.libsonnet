@@ -20,6 +20,8 @@
     local readinessProbe = container.readinessProbe,
     local resources = container.resources,
     local securityContext = container.securityContext,
+    local envVar = $.core.v1.envVar,
+    local envVarFromFieldRef = $.core.v1.envVar.valueFrom.fieldRef,
 
     new(name, image)::
       $.core.v1.container.new(name, image)
@@ -27,6 +29,12 @@
           "--leader-elect",
         ])
         +container.withCommand("/manager")
+        // this concept is explained here: https://kubernetes.io/docs/tasks/inject-data-application/environment-variable-expose-pod-information/
+        // more values can be found: https://kubernetes.io/docs/concepts/workloads/pods/downward-api/#available-fields
+        +container.withEnv([
+            envVar.withName("K8S_POD_NAMESPACE")+
+            envVarFromFieldRef.withFieldPath("metadata.namespace")
+        ])
         +livenessProbe.withInitialDelaySeconds(15)
         +livenessProbe.withPeriodSeconds(20)
         +livenessProbe.httpGet.withPath("/healthz")
