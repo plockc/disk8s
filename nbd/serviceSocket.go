@@ -27,6 +27,7 @@ type serviceSocket struct {
 }
 
 func NewDomainSocketServer(domainSockets <-chan uintptr) error {
+	fmt.Println("server has been provided a domain socket")
 	var lastError error
 	for domainSocketDescriptor := range domainSockets {
 		lastError = serviceSocket{os.NewFile(domainSocketDescriptor, "unix")}.server()

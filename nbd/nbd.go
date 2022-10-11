@@ -59,6 +59,7 @@ func NewDomainSocketClient(ctx context.Context, deviceName string, domainSockets
 }
 
 func NewTcpClient(ctx context.Context, deviceName string, port int) error {
+	fmt.Println("opening TCP connection to server")
 	conn, err := net.DialTCP("tcp4", nil, &net.TCPAddr{Port: port})
 	if err != nil {
 		return err
@@ -101,8 +102,6 @@ func Client(ctx context.Context, deviceName string, socket uintptr) error {
 		})
 	}
 	defer shutdownDevice()
-
-	/////////////////////
 
 	// set the request / reply socket on /dev/nbd*
 	fmt.Println("Setting domain socket after clearing prior socket (in case of prior crash)")
