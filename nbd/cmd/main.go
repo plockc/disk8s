@@ -9,13 +9,15 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"time"
 
 	"github.com/plockc/disk8s/nbd"
 )
 
 func main() {
-	clientDevice := flag.String("local", "", "spawns an nbd client on given device path (e.g. /dev/nbd0) to connect to server over unix socket")
-	port := flag.Uint("port", 10809, "port for TCP server on all interfaces")
+	clientDevice := flag.String("client", "", "spawns an nbd client on given device path (e.g. /dev/nbd0) to connect to server over unix socket")
+	tcp := flag.Bool("tcp", false, "use tcp for client and server, if no client, tcp is automatic")
+	port := flag.Int("port", 10809, "port for TCP server on all interfaces")
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -30,25 +32,39 @@ func main() {
 		return "Interrupt handler", nil
 	})
 
-	if *clientDevice == "" {
+	// always run a server
+	// check and register a start if we are running server in tcp mode
+	if *clientDevice == "" || *tcp {
 		routines = append(
 			routines,
 			func() (string, error) {
 				return "server", nbd.NewTCPSocketServer(ctx, *port)
 			},
 		)
-	} else {
-		domainSockets := make(chan uintptr)
+	}
+	// check if we are running a client
+	if *clientDevice != "" {
+		// either we're running tcp client locally (server already registered to start)
+		// or need domain sockets on both client and server
+		if *tcp {
+			routines = append(routines, func() (string, error) {
+				// give the server a moment to come up
+				time.Sleep(1 * time.Second)
+				return "server", nbd.NewTcpClient(ctx, *clientDevice, *port)
+			})
+		} else {
+			domainSockets := make(chan uintptr)
 
-		routines = append(
-			routines,
-			func() (string, error) {
-				return "Client", nbd.Client(ctx, *clientDevice, domainSockets)
-			},
-			func() (string, error) {
-				return "server", nbd.NewDomainSocketServer(domainSockets)
-			},
-		)
+			routines = append(
+				routines,
+				func() (string, error) {
+					return "Client", nbd.NewDomainSocketClient(ctx, *clientDevice, domainSockets)
+				},
+				func() (string, error) {
+					return "server", nbd.NewDomainSocketServer(domainSockets)
+				},
+			)
+		}
 	}
 
 	for _, r := range routines {

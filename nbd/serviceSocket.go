@@ -12,6 +12,16 @@ import (
 	"strconv"
 )
 
+var greeting []byte
+
+func init() {
+	greeting := make([]byte, 152)
+	copy(greeting[0:8], []byte("NBDMAGIC"))
+	binary.BigEndian.PutUint64(greeting[8:16], nbd_CLISERV_MAGIC)
+	binary.BigEndian.PutUint64(greeting[16:24], diskSize)
+	binary.BigEndian.PutUint32(greeting[24:28], nbd_FLAG_SEND_TRIM)
+}
+
 type serviceSocket struct {
 	io.ReadWriter
 }
@@ -24,9 +34,9 @@ func NewDomainSocketServer(domainSockets <-chan uintptr) error {
 	return lastError
 }
 
-func NewTCPSocketServer(ctx context.Context, port uint) error {
+func NewTCPSocketServer(ctx context.Context, port int) error {
 	// listen for connections
-	server, err := net.Listen("tcp", ":"+strconv.Itoa(int(port)))
+	server, err := net.Listen("tcp", ":"+strconv.Itoa(port))
 	if err != nil {
 		return err
 	}
@@ -51,12 +61,6 @@ func NewTCPSocketServer(ctx context.Context, port uint) error {
 			}
 			return nil
 		}
-
-		greeting := make([]byte, 152)
-		copy(greeting[0:8], []byte("NBDMAGIC"))
-		binary.BigEndian.PutUint64(greeting[8:16], nbd_CLISERV_MAGIC)
-		binary.BigEndian.PutUint64(greeting[16:24], diskSize)
-		binary.BigEndian.PutUint32(greeting[24:28], nbd_FLAG_SEND_TRIM)
 
 		if n, err := conn.Write(greeting); err != nil || n != 152 {
 			fmt.Println("Failed to write greeting to client during negotiation, wrote", n, "bytes and error:", err)

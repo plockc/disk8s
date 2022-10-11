@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"sync"
 	"syscall"
@@ -33,7 +34,44 @@ const (
 	nbd_FLAG_SEND_TRIM = (1 << 5)
 )
 
-func Client(ctx context.Context, deviceName string, domainSockets chan<- uintptr) error {
+func NewDomainSocketClient(ctx context.Context, deviceName string, domainSockets chan<- uintptr) error {
+	// the socketPair is a pair of anonymous connected unix domain socket.
+	// one goes to the kernel, the other this process
+	fmt.Println("opening UNIX domain sockets for client and server")
+	socketPair, err := syscall.Socketpair(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
+	if err != nil {
+		fmt.Printf("Failed to create socketpair: %v", err)
+		os.Exit(1)
+	}
+	closeSocketPair := func() {
+		syscall.Close(socketPair[0])
+		syscall.Close(socketPair[1])
+		fmt.Println("domain sockets for communicating with kernel are closed")
+	}
+	defer closeSocketPair()
+
+	// the first socket in the pair went to the devDevice, the second we'll use in the
+	// nbd server
+	domainSockets <- uintptr(socketPair[1])
+	close(domainSockets)
+
+	return Client(ctx, deviceName, uintptr(socketPair[0]))
+}
+
+func NewTcpClient(ctx context.Context, deviceName string, port int) error {
+	conn, err := net.DialTCP("tcp4", nil, &net.TCPAddr{Port: port})
+	if err != nil {
+		return err
+	}
+	f, err := conn.File()
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return Client(ctx, deviceName, f.Fd())
+}
+
+func Client(ctx context.Context, deviceName string, socket uintptr) error {
 	// the device is like /dev/nbd0 and is used by the user as a block device
 	// this code will interact with it as a device with ioctl
 	fmt.Println("opening " + deviceName)
@@ -64,25 +102,7 @@ func Client(ctx context.Context, deviceName string, domainSockets chan<- uintptr
 	}
 	defer shutdownDevice()
 
-	// the socketPair is a pair of anonymous connected unix domain socket.
-	// one goes to the kernel, the other this process
-	fmt.Println("opening UNIX domain socket")
-	socketPair, err := syscall.Socketpair(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
-	if err != nil {
-		fmt.Printf("Failed to created socketpair: %v", err)
-		os.Exit(1)
-	}
-	closeSocketPair := func() {
-		syscall.Close(socketPair[0])
-		syscall.Close(socketPair[1])
-		fmt.Println("domain sockets for communicating with kernel are closed")
-	}
-	defer closeSocketPair()
-
-	// the first socket in the pair went to the devDevice, the second we'll use in the
-	// nbd server
-	domainSockets <- uintptr(socketPair[1])
-	close(domainSockets)
+	/////////////////////
 
 	// set the request / reply socket on /dev/nbd*
 	fmt.Println("Setting domain socket after clearing prior socket (in case of prior crash)")
@@ -94,7 +114,7 @@ func Client(ctx context.Context, deviceName string, domainSockets chan<- uintptr
 	fmt.Printf("Setting disk size to %dMB\n", diskSize/1024/1024)
 	_ = devDeviceFd.ioctl(nbd_SET_SIZE, uintptr(diskSize))
 
-	if err := devDeviceFd.ioctl(nbd_SET_SOCK, uintptr(socketPair[0])); err != nil {
+	if err := devDeviceFd.ioctl(nbd_SET_SOCK, uintptr(socket)); err != nil {
 		return fmt.Errorf("failed to give the kernel its UNIX domain socket: %w", err)
 	}
 
