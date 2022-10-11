@@ -6,22 +6,68 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"os"
+	"strconv"
 )
 
 type serviceSocket struct {
-	descriptor
+	io.ReadWriter
 }
 
-func (ss *serviceSocket) server(ctx context.Context) error {
+func NewDomainSocketServer(domainSockets <-chan uintptr) error {
+	var lastError error
+	for domainSocketDescriptor := range domainSockets {
+		lastError = serviceSocket{os.NewFile(domainSocketDescriptor, "unix")}.server()
+	}
+	return lastError
+}
+
+func NewTCPSocketServer(ctx context.Context, port uint) error {
+	// listen for connections
+	server, err := net.Listen("tcp", ":"+strconv.Itoa(int(port)))
+	if err != nil {
+		return err
+	}
+	fmt.Println("Listening port", port)
+	defer server.Close()
+
+	// handle external shutdown or internal shutdown
+	var cancel func()
+	ctx, cancel = context.WithCancel(ctx)
+	defer cancel()
+	go func() {
+		<-ctx.Done()
+		fmt.Println("begin gracefully shutting down server...")
+		server.Close()
+	}()
+
+	for {
+		conn, err := server.Accept()
+		if err != nil {
+			if ctx.Err() != nil && !errors.Is(ctx.Err(), context.Canceled) {
+				return err
+			}
+			return nil
+		}
+		if err := (serviceSocket{conn}).server(); err != nil {
+			fmt.Println("Server connection exited with ERROR:", err)
+		} else {
+			fmt.Println("Server connection closed")
+		}
+		conn.Close()
+	}
+	return nil
+}
+
+func (ss serviceSocket) server() error {
 	fmt.Println("starting server")
-	f := os.NewFile(uintptr(ss.descriptor), "unix")
 	mem := Memory{
 		data: make([]byte, diskSize),
 	}
 	for {
 		req := request(make([]byte, 28))
-		if n, err := f.Read(req); err != nil || n != 28 {
+		if n, err := ss.Read(req); err != nil || n != 28 {
 			// if no error but not bytes, the connection was closed, exit the server
 			if errors.Is(err, io.EOF) && n == 0 {
 				return nil
@@ -35,6 +81,7 @@ func (ss *serviceSocket) server(ctx context.Context) error {
 		var replyData []byte
 		switch req.command() {
 		case nbd_CMD_DISC:
+			fmt.Println("Server is disconnecting")
 			mem.Disconnect()
 			return nil
 		case nbd_CMD_READ:
@@ -50,7 +97,7 @@ func (ss *serviceSocket) server(ctx context.Context) error {
 		case nbd_CMD_WRITE:
 			rep = newReply(req.handle())
 			respData := make([]byte, req.len())
-			if _, err := io.ReadFull(f, respData); err != nil {
+			if _, err := io.ReadFull(ss, respData); err != nil {
 				return fmt.Errorf("could not read request data for a remote device write: %w", err)
 			}
 			if err := mem.WriteAt(respData, req.offset()); err != nil {
@@ -67,13 +114,11 @@ func (ss *serviceSocket) server(ctx context.Context) error {
 			fmt.Println("UNKNOWN COMMAND", req.command())
 			continue
 		}
-		if rep == nil {
-			fmt.Println("no reply")
-		} else {
-			if n, err := f.Write(*rep); err != nil || n != len(*rep) {
+		if rep != nil {
+			if n, err := ss.Write(*rep); err != nil || n != len(*rep) {
 				return fmt.Errorf("failed to send reply to /dev/nbd*: %w", err)
 			}
-			if n, err := f.Write(replyData); err != nil || n != len(replyData) {
+			if n, err := ss.Write(replyData); err != nil || n != len(replyData) {
 				return fmt.Errorf("failed to write back data payload to /dev/nbd*: %w", err)
 			}
 		}

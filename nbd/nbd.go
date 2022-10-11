@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/signal"
 	"sync"
 	"syscall"
 )
@@ -34,9 +33,7 @@ const (
 	nbd_FLAG_SEND_TRIM = (1 << 5)
 )
 
-func Driver(ctx context.Context) error {
-	deviceName := "/dev/nbd0"
-
+func Client(ctx context.Context, deviceName string, domainSockets chan<- uintptr) error {
 	// the device is like /dev/nbd0 and is used by the user as a block device
 	// this code will interact with it as a device with ioctl
 	fmt.Println("opening " + deviceName)
@@ -55,11 +52,15 @@ func Driver(ctx context.Context) error {
 	}()
 	devDeviceFd := descriptor(devDeviceFile.Fd())
 
+	shutdownOnce := sync.Once{}
 	shutdownDevice := func() {
-		// let us try to clear out the queue before exiting, eh?
-		_ = devDeviceFd.ioctl(nbd_CLEAR_QUE, 0)
-		_ = devDeviceFd.ioctl(nbd_CLEAR_SOCK, 0)
-		fmt.Println("Device has been disconnected")
+		shutdownOnce.Do(func() {
+			// let us try to clear out the queue before exiting, eh?
+			_ = devDeviceFd.ioctl(nbd_DISCONNECT, 0)
+			_ = devDeviceFd.ioctl(nbd_CLEAR_QUE, 0)
+			_ = devDeviceFd.ioctl(nbd_CLEAR_SOCK, 0)
+			fmt.Println("Device has been disconnected")
+		})
 	}
 	defer shutdownDevice()
 
@@ -74,12 +75,14 @@ func Driver(ctx context.Context) error {
 	closeSocketPair := func() {
 		syscall.Close(socketPair[0])
 		syscall.Close(socketPair[1])
-		fmt.Println("Socket Pair for IOCTL has been shut down")
+		fmt.Println("domain sockets for communicating with kernel are closed")
 	}
 	defer closeSocketPair()
+
 	// the first socket in the pair went to the devDevice, the second we'll use in the
 	// nbd server
-	ss := serviceSocket{descriptor: descriptor(socketPair[1])}
+	domainSockets <- uintptr(socketPair[1])
+	close(domainSockets)
 
 	// set the request / reply socket on /dev/nbd*
 	fmt.Println("Setting domain socket after clearing prior socket (in case of prior crash)")
@@ -99,69 +102,30 @@ func Driver(ctx context.Context) error {
 	fmt.Println("Send Flags, indicating TRIM is supported")
 	devDeviceFd.ioctl(nbd_SET_FLAGS, nbd_FLAG_SEND_TRIM)
 
-	// create local cancel context so we can shut down all the routines we create
-	// for any of the termination conditions
-	// - the ioctl DO_IT returns after a disconnect is sent (error condition)
-	// - Signal TERM (Ctrl-C) is sent
-	cancelCtx, cancel := context.WithCancel(ctx)
-
-	// helper to shutdown the client (sending a disconnect), and cancel the context
-	// so other routines can exit
-	shutdownOnce := sync.Once{}
-	shutdown := func() {
-		shutdownOnce.Do(func() {
-			fmt.Println("sending shutdown ioctls to nbd device")
-			_ = devDeviceFd.ioctl(nbd_DISCONNECT, 0)
-			_ = devDeviceFd.ioctl(nbd_CLEAR_QUE, 0)
-			_ = devDeviceFd.ioctl(nbd_CLEAR_SOCK, 0)
-			cancel()
-		})
-	}
+	// handle external shutdown or internal shutdown
+	var cancel func()
+	ctx, cancel = context.WithCancel(ctx)
+	defer cancel()
+	go func() {
+		<-ctx.Done()
+		fmt.Println("begin gracefully shutting down device client...")
+		shutdownDevice()
+	}()
 
 	fmt.Println("Starting nbd device client...")
-	wg := sync.WaitGroup{}
-	wg.Add(1)
 	var clientErr error
-	go func() {
-		defer wg.Done()
-		// this will block until the kernel receives close
-		fmt.Println("starting nbd client")
-		clientErr = devDeviceFd.ioctl(nbd_DO_IT, 0)
-		if clientErr != nil {
-			if errNo, ok := errors.Unwrap(clientErr).(syscall.Errno); ok && errNo == syscall.EBUSY {
-				fmt.Println("is the nbd device mounted?", clientErr)
-			} else {
-				fmt.Println("nbd device client is done with error", clientErr)
-			}
+	// this will block until the kernel receives close
+	fmt.Println("starting nbd client")
+	clientErr = devDeviceFd.ioctl(nbd_DO_IT, 0)
+	if clientErr != nil {
+		if errNo, ok := errors.Unwrap(clientErr).(syscall.Errno); ok && errNo == syscall.EBUSY {
+			fmt.Println("is the nbd device mounted?", clientErr)
 		} else {
-			fmt.Println("DO_IT is done")
+			fmt.Println("nbd device client is done with error", clientErr)
 		}
-		shutdown()
-	}()
-
-	sigChan := make(chan os.Signal)
-	signal.Notify(sigChan, os.Interrupt)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		select {
-		case <-sigChan:
-			fmt.Println("Received Interrupt signal")
-		case <-cancelCtx.Done():
-		}
-		shutdown()
-	}()
-
-	// this will exit after receiving a disconnect request or there was an error
-	serverErr := ss.server(cancelCtx)
-	shutdown()
-
-	fmt.Println("server exited, waiting for all routines to finish, err status:", serverErr)
-	// wait for routines to complete before exiting
-	wg.Wait()
-
-	if serverErr != nil {
-		return serverErr
+	} else {
+		fmt.Println("kernel has released the client")
 	}
+
 	return clientErr
 }
