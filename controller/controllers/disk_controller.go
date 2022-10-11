@@ -18,9 +18,13 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -61,16 +65,62 @@ func (r *DiskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	const replicatedDisk = "replicated-disk"
+	deployName := replicated - disk + "-" + req.Name
 	deployNamespacedName := types.NamespacedName{
 		Namespace: os.Getenv("K8S_POD_NAMESPACE"),
-		Name:      "replicated-disk-" + req.Name,
+		Name:      deployName,
 	}
 	l.Info("NAMESSPACE is " + deployNamespacedName.Namespace)
 
 	var deploy appsv1.Deployment
-	if err := r.Get(ctx, deployNamespacedName, &deploy); err != nil {
+	err := r.Get(ctx, deployNamespacedName, &deploy)
+	deploymentNotFound := errors.IsNotFound(err)
+	if err != nil && !deploymentNotFound {
 		l.Error(err, "unable to list child Pods")
 		return ctrl.Result{}, err
+	}
+
+	if deploymentNotFound {
+		fmt.Println("Creating missing deployment")
+		var replicas int32 = 1
+		deploy := appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "my-test-pod",
+				Namespace: "default",
+			},
+			Spec: appsv1.DeploymentSpec{
+				Replicas: &replicas,
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						replicatedDisk: req.Name,
+					},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							replicatedDisk: req.Name,
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "disk",
+								Image: "nginx:1.12",
+								Ports: []corev1.ContainerPort{
+									{
+										Name:          "diskGRPC",
+										Protocol:      corev1.ProtocolTCP,
+										ContainerPort: 5000,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		r.Update(ctx, &deploy)
 	}
 
 	return ctrl.Result{}, nil
