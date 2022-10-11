@@ -5,7 +5,8 @@ import (
 )
 
 const (
-	nbd_REPLY_MAGIC = 0x67446698
+	nbd_REPLY_MAGIC          = 0x67446698
+	nbd_CLISERV_MAGIC uint64 = 0x00420281861253
 )
 
 type reply []byte

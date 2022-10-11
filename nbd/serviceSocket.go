@@ -2,6 +2,7 @@ package nbd
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -50,6 +51,16 @@ func NewTCPSocketServer(ctx context.Context, port uint) error {
 			}
 			return nil
 		}
+
+		greeting := make([]byte, 152)
+		copy(greeting[0:8], []byte("NBDMAGIC"))
+		binary.BigEndian.PutUint64(greeting[8:16], nbd_CLISERV_MAGIC)
+		binary.BigEndian.PutUint64(greeting[16:24], diskSize)
+		binary.BigEndian.PutUint32(greeting[24:28], nbd_FLAG_SEND_TRIM)
+
+		if n, err := conn.Write(greeting); err != nil || n != 152 {
+			fmt.Println("Failed to write greeting to client during negotiation, wrote", n, "bytes and error:", err)
+		}
 		if err := (serviceSocket{conn}).server(); err != nil {
 			fmt.Println("Server connection exited with ERROR:", err)
 		} else {
@@ -57,7 +68,6 @@ func NewTCPSocketServer(ctx context.Context, port uint) error {
 		}
 		conn.Close()
 	}
-	return nil
 }
 
 func (ss serviceSocket) server() error {
