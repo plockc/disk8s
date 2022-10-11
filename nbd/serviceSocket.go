@@ -2,16 +2,15 @@ package nbd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"os"
-	"sync"
 )
 
 type serviceSocket struct {
 	descriptor
-	sync.Once
 }
 
 func (ss *serviceSocket) server(ctx context.Context) error {
@@ -22,25 +21,26 @@ func (ss *serviceSocket) server(ctx context.Context) error {
 	}
 	for {
 		req := request(make([]byte, 28))
-		fmt.Println("waiting for request")
 		if n, err := f.Read(req); err != nil || n != 28 {
+			// if no error but not bytes, the connection was closed, exit the server
+			if errors.Is(err, io.EOF) && n == 0 {
+				return nil
+			}
 			return fmt.Errorf("local nbd server could not read request, got %d bytes: %w", n, err)
 		}
 		if req.magic() != nbd_REQUEST_MAGIC {
 			return fmt.Errorf("Fatal error: received packet with wrong Magic number")
 		}
-		fmt.Println("received request command is", req.command())
 		var rep *reply
 		var replyData []byte
 		switch req.command() {
 		case nbd_CMD_DISC:
 			mem.Disconnect()
-			ss.shutdown()
 			return nil
 		case nbd_CMD_READ:
 			rep = newReply(req.handle())
 			replyData = make([]byte, req.len())
-			if err := mem.ReadAt(replyData, uint(req.offset())); err != nil {
+			if err := mem.ReadAt(replyData, req.offset()); err != nil {
 				log.Println(err)
 				// Reply with an EPERM
 				rep.err(1)
@@ -57,6 +57,12 @@ func (ss *serviceSocket) server(ctx context.Context) error {
 				log.Println("error for data written to device when writing to remote device:", err)
 				rep.err(1)
 			}
+		case nbd_CMD_TRIM:
+			rep = newReply(req.handle())
+			if err := mem.TrimAt(req.offset(), req.len()); err != nil {
+				log.Println("error for data written to device when writing to remote device:", err)
+				rep.err(1)
+			}
 		default:
 			fmt.Println("UNKNOWN COMMAND", req.command())
 			continue
@@ -70,14 +76,6 @@ func (ss *serviceSocket) server(ctx context.Context) error {
 			if n, err := f.Write(replyData); err != nil || n != len(replyData) {
 				return fmt.Errorf("failed to write back data payload to /dev/nbd*: %w", err)
 			}
-			fmt.Println("wrote reply for", req.handle(), "and data size was", len(replyData))
 		}
 	}
-}
-
-func (ss *serviceSocket) shutdown() {
-	ss.Once.Do(func() {
-		fmt.Println("Disconnecting")
-		_ = ss.ioctl(nbd_DISCONNECT, 0)
-	})
 }
