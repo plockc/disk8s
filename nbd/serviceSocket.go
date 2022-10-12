@@ -12,14 +12,13 @@ import (
 	"strconv"
 )
 
-var greeting []byte
-
-func init() {
-	greeting = make([]byte, 152)
+func greeting(diskSize uint64) []byte {
+	greeting := make([]byte, 152)
 	copy(greeting[0:8], []byte("NBDMAGIC"))
 	binary.BigEndian.PutUint64(greeting[8:16], nbd_CLISERV_MAGIC)
-	binary.BigEndian.PutUint64(greeting[16:24], 10*1024*1024)
+	binary.BigEndian.PutUint64(greeting[16:24], diskSize)
 	binary.BigEndian.PutUint32(greeting[24:28], nbd_FLAG_SEND_TRIM)
+	return greeting
 }
 
 type serviceSocket struct {
@@ -76,8 +75,9 @@ func NewTCPSocketServer(ctx context.Context, store Storage, port int) error {
 		}()
 
 		fmt.Println("connection accepted, sending greeting")
-		if n, err := conn.Write(greeting); err != nil || n != 152 {
-			fmt.Println("Failed to write greeting to client during negotiation, wrote", n, "of", len(greeting), "bytes and error:", err)
+		greet := greeting(store.Size())
+		if n, err := conn.Write(greet); err != nil || n != 152 {
+			fmt.Println("Failed to write greeting to client during negotiation, wrote", n, "of", len(greet), "bytes and error:", err)
 		} else {
 			if err := (serviceSocket{conn, store}).server(); err != nil {
 				fmt.Println("Server connection exited with ERROR:", err)

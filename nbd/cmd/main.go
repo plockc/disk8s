@@ -9,12 +9,16 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/plockc/disk8s/nbd"
 )
 
 func main() {
+	killCtx, cancelKill := context.WithCancel(context.Background())
+	go handleKill(killCtx)
+
 	clientDevice := flag.String("client", "", "spawns an nbd client on given device path (e.g. /dev/nbd0) to connect to server over unix socket")
 	tcp := flag.Bool("tcp", false, "use tcp for client and server, if no client, tcp is automatic")
 	port := flag.Int("port", 10809, "port for TCP server on all interfaces")
@@ -28,7 +32,7 @@ func main() {
 	routines := []func() (string, error){}
 
 	routines = append(routines, func() (string, error) {
-		handleInterrupt(ctx, cancel)
+		handleSignal(ctx, cancel)
 		return "Interrupt handler", nil
 	})
 
@@ -84,15 +88,28 @@ func main() {
 
 	// wait for routines to complete before exiting
 	wg.Wait()
+
+	cancelKill()
 }
 
-func handleInterrupt(ctx context.Context, cancel func()) {
+func handleSignal(ctx context.Context, cancel func()) {
 	sigChan := make(chan os.Signal)
-	signal.Notify(sigChan, os.Interrupt)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	select {
 	case <-sigChan:
-		fmt.Println("Received Interrupt signal")
+		fmt.Println("Received signal")
 		cancel()
+	case <-ctx.Done():
+	}
+}
+
+func handleKill(ctx context.Context) {
+	sigChan := make(chan os.Signal)
+	signal.Notify(sigChan, os.Kill)
+	select {
+	case <-sigChan:
+		fmt.Println("Received Kill signal")
+		os.Exit(1)
 	case <-ctx.Done():
 	}
 }
