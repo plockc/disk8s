@@ -15,7 +15,7 @@ import (
 var greeting []byte
 
 func init() {
-	greeting := make([]byte, 152)
+	greeting = make([]byte, 152)
 	copy(greeting[0:8], []byte("NBDMAGIC"))
 	binary.BigEndian.PutUint64(greeting[8:16], nbd_CLISERV_MAGIC)
 	binary.BigEndian.PutUint64(greeting[16:24], diskSize)
@@ -57,20 +57,30 @@ func NewTCPSocketServer(ctx context.Context, port int) error {
 	for {
 		conn, err := server.Accept()
 		if err != nil {
+			// TODO: fix
 			if ctx.Err() != nil && !errors.Is(ctx.Err(), context.Canceled) {
-				return err
+				return nil
 			}
-			return nil
+			return err
 		}
 
+		go func() {
+			<-ctx.Done()
+			fmt.Println("closing connection because context was cancelled")
+			conn.Close()
+		}()
+
+		fmt.Println("connection accepted, sending greeting")
 		if n, err := conn.Write(greeting); err != nil || n != 152 {
-			fmt.Println("Failed to write greeting to client during negotiation, wrote", n, "bytes and error:", err)
-		}
-		if err := (serviceSocket{conn}).server(); err != nil {
-			fmt.Println("Server connection exited with ERROR:", err)
+			fmt.Println("Failed to write greeting to client during negotiation, wrote", n, "of", len(greeting), "bytes and error:", err)
 		} else {
-			fmt.Println("Server connection closed")
+			if err := (serviceSocket{conn}).server(); err != nil {
+				fmt.Println("Server connection exited with ERROR:", err)
+			} else {
+				fmt.Println("Server handler exited with no error")
+			}
 		}
+		fmt.Println("server closing connection")
 		conn.Close()
 	}
 }
@@ -96,7 +106,7 @@ func (ss serviceSocket) server() error {
 		var replyData []byte
 		switch req.command() {
 		case nbd_CMD_DISC:
-			fmt.Println("Server is disconnecting")
+			fmt.Println("Server is disconnecting by request of remote kernel")
 			mem.Disconnect()
 			return nil
 		case nbd_CMD_READ:

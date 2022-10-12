@@ -59,23 +59,39 @@ func NewDomainSocketClient(ctx context.Context, deviceName string, domainSockets
 }
 
 func NewTcpClient(ctx context.Context, deviceName string, port int) error {
+	err := withTcpConn(port, func(c *net.TCPConn) error {
+		greeting := make([]byte, 152)
+		fmt.Println("trying to read!")
+		n, err := c.Read(greeting)
+		if err != nil || n != 152 {
+			return fmt.Errorf("Client Failed to read greeting during negotiation, read %d/152 bytes and error: %w", n, err)
+		}
+
+		f, err := c.File()
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		return Client(ctx, deviceName, f.Fd())
+	})
+	return err
+}
+
+func withTcpConn(port int, f func(*net.TCPConn) error) error {
 	fmt.Println("opening TCP connection to server")
 	conn, err := net.DialTCP("tcp4", nil, &net.TCPAddr{Port: port})
 	if err != nil {
 		return err
 	}
-	f, err := conn.File()
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	return Client(ctx, deviceName, f.Fd())
+	defer conn.Close()
+	err = f(conn)
+	return err
 }
 
 func Client(ctx context.Context, deviceName string, socket uintptr) error {
 	// the device is like /dev/nbd0 and is used by the user as a block device
 	// this code will interact with it as a device with ioctl
-	fmt.Println("opening " + deviceName)
+	fmt.Println("Starting nbd device", deviceName, "...")
 	devDeviceFile, err := os.OpenFile(deviceName, os.O_RDWR, 0600)
 	if err != nil {
 		return fmt.Errorf(
@@ -98,13 +114,13 @@ func Client(ctx context.Context, deviceName string, socket uintptr) error {
 			_ = devDeviceFd.ioctl(nbd_DISCONNECT, 0)
 			_ = devDeviceFd.ioctl(nbd_CLEAR_QUE, 0)
 			_ = devDeviceFd.ioctl(nbd_CLEAR_SOCK, 0)
-			fmt.Println("Device has been disconnected")
+			fmt.Println("Client Device has been disconnected")
 		})
 	}
 	defer shutdownDevice()
 
 	// set the request / reply socket on /dev/nbd*
-	fmt.Println("Setting domain socket after clearing prior socket (in case of prior crash)")
+	fmt.Println("Setting socket after clearing prior socket (in case of prior crash)")
 	_ = devDeviceFd.ioctl(nbd_CLEAR_QUE, 0)
 	_ = devDeviceFd.ioctl(nbd_CLEAR_SOCK, 0)
 
@@ -131,10 +147,9 @@ func Client(ctx context.Context, deviceName string, socket uintptr) error {
 		shutdownDevice()
 	}()
 
-	fmt.Println("Starting nbd device client...")
 	var clientErr error
 	// this will block until the kernel receives close
-	fmt.Println("starting nbd client")
+	fmt.Println("Client signalling kernel to start handling block device")
 	clientErr = devDeviceFd.ioctl(nbd_DO_IT, 0)
 	if clientErr != nil {
 		if errNo, ok := errors.Unwrap(clientErr).(syscall.Errno); ok && errNo == syscall.EBUSY {

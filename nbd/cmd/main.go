@@ -38,7 +38,7 @@ func main() {
 		routines = append(
 			routines,
 			func() (string, error) {
-				return "server", nbd.NewTCPSocketServer(ctx, *port)
+				return "TCP Server", nbd.NewTCPSocketServer(ctx, *port)
 			},
 		)
 	}
@@ -50,7 +50,7 @@ func main() {
 			routines = append(routines, func() (string, error) {
 				// give the server a moment to come up
 				time.Sleep(1 * time.Second)
-				return "server", nbd.NewTcpClient(ctx, *clientDevice, *port)
+				return "TCP Client", nbd.NewTcpClient(ctx, *clientDevice, *port)
 			})
 		} else {
 			domainSockets := make(chan uintptr)
@@ -58,10 +58,10 @@ func main() {
 			routines = append(
 				routines,
 				func() (string, error) {
-					return "Client", nbd.NewDomainSocketClient(ctx, *clientDevice, domainSockets)
+					return "Domain Socket Client", nbd.NewDomainSocketClient(ctx, *clientDevice, domainSockets)
 				},
 				func() (string, error) {
-					return "server", nbd.NewDomainSocketServer(domainSockets)
+					return "Domain Socket Server", nbd.NewDomainSocketServer(domainSockets)
 				},
 			)
 		}
