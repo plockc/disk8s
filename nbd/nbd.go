@@ -2,8 +2,10 @@ package nbd
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"sync"
@@ -14,8 +16,6 @@ import (
 type Device struct {
 	deviceIndex uint8
 }
-
-const diskSize = 10 * 1024 * 1024
 
 // operation is a ioctl operation to manage the network block device
 type operation uintptr
@@ -55,26 +55,41 @@ func NewDomainSocketClient(ctx context.Context, deviceName string, domainSockets
 	domainSockets <- uintptr(socketPair[1])
 	close(domainSockets)
 
-	return Client(ctx, deviceName, uintptr(socketPair[0]))
+	return Client(ctx, deviceName, 10*1024*1024, nbd_FLAG_SEND_TRIM, uintptr(socketPair[0]))
 }
 
 func NewTcpClient(ctx context.Context, deviceName string, port int) error {
 	err := withTcpConn(port, func(c *net.TCPConn) error {
-		greeting := make([]byte, 152)
-		fmt.Println("trying to read!")
-		n, err := c.Read(greeting)
-		if err != nil || n != 152 {
-			return fmt.Errorf("Client Failed to read greeting during negotiation, read %d/152 bytes and error: %w", n, err)
-		}
-
 		f, err := c.File()
 		if err != nil {
 			return err
 		}
+		diskSize, flags, err := readGreeting(f)
+		if err != nil {
+			return err
+		}
 		defer f.Close()
-		return Client(ctx, deviceName, f.Fd())
+		return Client(ctx, deviceName, diskSize, flags, f.Fd())
 	})
 	return err
+}
+
+func readGreeting(in io.Reader) (diskSize uint64, flags uint32, err error) {
+	greeting := make([]byte, 152)
+	n, err := in.Read(greeting)
+	if err != nil || n != 152 {
+		return 0, 0, fmt.Errorf("Client Failed to read greeting during negotiation, read %d/152 bytes and error: %w", n, err)
+	}
+
+	if binary.BigEndian.Uint64([]byte("NBDMAGIC")) != binary.BigEndian.Uint64(greeting[0:8]) {
+		return 0, 0, fmt.Errorf("missing NBDMAGIC from server greeting")
+	}
+	if nbd_CLISERV_MAGIC != binary.BigEndian.Uint64(greeting[8:16]) {
+		return 0, 0, fmt.Errorf("missing CLISERV magic from server greeting")
+	}
+	diskSize = binary.BigEndian.Uint64(greeting[16:24])
+	flags = binary.BigEndian.Uint32(greeting[24:48])
+	return
 }
 
 func withTcpConn(port int, f func(*net.TCPConn) error) error {
@@ -88,7 +103,7 @@ func withTcpConn(port int, f func(*net.TCPConn) error) error {
 	return err
 }
 
-func Client(ctx context.Context, deviceName string, socket uintptr) error {
+func Client(ctx context.Context, deviceName string, diskSize uint64, flags uint32, socket uintptr) error {
 	// the device is like /dev/nbd0 and is used by the user as a block device
 	// this code will interact with it as a device with ioctl
 	fmt.Println("Starting nbd device", deviceName, "...")
@@ -135,7 +150,7 @@ func Client(ctx context.Context, deviceName string, socket uintptr) error {
 
 	// tell kernel that TRIM is supported
 	fmt.Println("Send Flags, indicating TRIM is supported")
-	devDeviceFd.ioctl(nbd_SET_FLAGS, nbd_FLAG_SEND_TRIM)
+	devDeviceFd.ioctl(nbd_SET_FLAGS, uintptr(flags))
 
 	// handle external shutdown or internal shutdown
 	var cancel func()

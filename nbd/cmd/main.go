@@ -38,7 +38,7 @@ func main() {
 		routines = append(
 			routines,
 			func() (string, error) {
-				return "TCP Server", nbd.NewTCPSocketServer(ctx, *port)
+				return "TCP Server", nbd.NewTCPSocketServer(ctx, nbd.NewMemory(), *port)
 			},
 		)
 	}
@@ -61,7 +61,7 @@ func main() {
 					return "Domain Socket Client", nbd.NewDomainSocketClient(ctx, *clientDevice, domainSockets)
 				},
 				func() (string, error) {
-					return "Domain Socket Server", nbd.NewDomainSocketServer(domainSockets)
+					return "Domain Socket Server", nbd.NewDomainSocketServer(nbd.NewMemory(), domainSockets)
 				},
 			)
 		}
