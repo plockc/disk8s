@@ -22,6 +22,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -45,6 +46,7 @@ type DiskReconciler struct {
 //+kubebuilder:rbac:groups=disk8s.plockc.org,resources=disks/finalizers,verbs=update
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -67,13 +69,33 @@ func (r *DiskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	///////////
+	// Ensure Persistent Volume Claim for Replicated Disk
+	///////////
+	pvcName := "nbd-0-" + req.Name
+	oMeta := metav1.ObjectMeta{Name: pvcName, Namespace: os.Getenv("K8S_POD_NAMESPACE")}
+	var pvc = corev1.PersistentVolumeClaim{ObjectMeta: oMeta}
+	res, err := controllerutil.CreateOrUpdate(ctx, r.Client, &pvc, func() error {
+		size, err := resource.ParseQuantity("100Mi")
+		if err != nil {
+			return err
+		}
+		mutateNbdServerPersistentVolumeClaim(&pvc, size)
+		controllerutil.SetControllerReference(&disk, &pvc, r.Scheme)
+		return nil
+	})
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	l.Info("Replicated Disk Persistent Volume " + string(res))
+
+	///////////
 	// Ensure Deployment for Replicated Disk
 	///////////
 	deployName := replicatedDiskPrefix + "-" + req.Name
-	oMeta := metav1.ObjectMeta{Name: deployName, Namespace: os.Getenv("K8S_POD_NAMESPACE")}
+	oMeta = metav1.ObjectMeta{Name: deployName, Namespace: os.Getenv("K8S_POD_NAMESPACE")}
 	var deploy = appsv1.Deployment{ObjectMeta: oMeta}
-	res, err := controllerutil.CreateOrUpdate(ctx, r.Client, &deploy, func() error {
-		mutateNbdServerDeployment(&deploy, req.Name)
+	res, err = controllerutil.CreateOrUpdate(ctx, r.Client, &deploy, func() error {
+		mutateNbdServerDeployment(&deploy, req.Name, pvcName)
 		controllerutil.SetControllerReference(&disk, &deploy, r.Scheme)
 		return nil
 	})
@@ -85,7 +107,7 @@ func (r *DiskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	///////////
 	// Ensure Service for Replicated Disk
 	///////////
-	serviceName := "svc-" + req.Name
+	serviceName := "nbd-" + req.Name
 	oMeta = metav1.ObjectMeta{Name: serviceName, Namespace: os.Getenv("K8S_POD_NAMESPACE")}
 	var svc = corev1.Service{ObjectMeta: oMeta}
 	res, err = controllerutil.CreateOrUpdate(ctx, r.Client, &svc, func() error {
@@ -106,6 +128,19 @@ func (r *DiskReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&disk8sv1alpha1.Disk{}).
 		Complete(r)
+}
+
+func mutateNbdServerPersistentVolumeClaim(pvc *corev1.PersistentVolumeClaim, size resource.Quantity) {
+	fs := corev1.PersistentVolumeFilesystem
+	pvc.Spec = corev1.PersistentVolumeClaimSpec{
+		AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+		VolumeMode:  &fs,
+		Resources: corev1.ResourceRequirements{
+			Requests: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceStorage: size,
+			},
+		},
+	}
 }
 
 func mutateNbdServerService(svc *corev1.Service, diskName string) {
@@ -134,7 +169,7 @@ func mutateNbdServerService(svc *corev1.Service, diskName string) {
 	}
 }
 
-func mutateNbdServerDeployment(deploy *appsv1.Deployment, diskName string) {
+func mutateNbdServerDeployment(deploy *appsv1.Deployment, diskName, pvcName string) {
 	var replicas int32 = 1
 	deploy.Spec = appsv1.DeploymentSpec{
 		Replicas: &replicas,
@@ -162,8 +197,14 @@ func mutateNbdServerDeployment(deploy *appsv1.Deployment, diskName string) {
 								ContainerPort: 10809,
 							},
 						},
+						VolumeMounts: []corev1.VolumeMount{{
+							Name: "data", MountPath: "/data",
+						}},
 					},
 				},
+				Volumes: []corev1.Volume{{Name: "data", VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvcName},
+				}}},
 			},
 		},
 	}

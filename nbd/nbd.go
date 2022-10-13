@@ -30,10 +30,6 @@ const (
 	nbd_SET_FLAGS  operation = (0xab<<8 | 10)
 )
 
-const (
-	nbd_FLAG_SEND_TRIM = (1 << 5)
-)
-
 func NewDomainSocketClient(ctx context.Context, deviceName string, domainSockets chan<- uintptr) error {
 	// the socketPair is a pair of anonymous connected unix domain socket.
 	// one goes to the kernel, the other this process
@@ -55,7 +51,7 @@ func NewDomainSocketClient(ctx context.Context, deviceName string, domainSockets
 	domainSockets <- uintptr(socketPair[1])
 	close(domainSockets)
 
-	return Client(ctx, deviceName, 10*1024*1024, nbd_FLAG_SEND_TRIM, uintptr(socketPair[0]))
+	return Client(ctx, deviceName, 10*1024*1024, 0, uintptr(socketPair[0]))
 }
 
 func NewTcpClient(ctx context.Context, deviceName string, port int) error {
@@ -148,8 +144,7 @@ func Client(ctx context.Context, deviceName string, diskSize uint64, flags uint3
 		return fmt.Errorf("failed to give the kernel its UNIX domain socket: %w", err)
 	}
 
-	// tell kernel that TRIM is supported
-	fmt.Println("Send Flags, indicating TRIM is supported")
+	fmt.Println("Send Flags")
 	devDeviceFd.ioctl(nbd_SET_FLAGS, uintptr(flags))
 
 	// handle external shutdown or internal shutdown

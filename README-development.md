@@ -108,19 +108,9 @@ Consider setting up [autoReload](https://www.devspace.sh/docs/5.x/configuration/
 
 Also consider setting up a special devspace manifest with larger runtime memory and CPU limits.
 
-### Updating generated code
+### Updating manifest or RBAC
 
-Steps to push updates, TODO: have devspace do this automatically
-
-```
-cd controller
-make manifests
-kustomize build config/default | gojq --yaml-input -s > ../environments/default/kustomized.json
-cd ../environments
-jsonnet --yaml-stream -J vendor -J lib default/disk8s.jsonnet  > default/disk8s.yaml
-```
-
-Exit the devspace shell
+Exit the devspace shell, then re-enter
 ```
 devspace dev
 ```

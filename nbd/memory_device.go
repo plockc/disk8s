@@ -13,7 +13,7 @@ type Memory struct {
 
 func NewMemory() Storage {
 	m := Memory{}
-	m.data = make([]byte, m.Size())
+	m.data = make([]byte, diskSize)
 	return &m
 }
 
@@ -41,15 +41,6 @@ func (m *Memory) WriteAt(p []byte, off uint64) error {
 	return nil
 }
 
-func (m *Memory) TrimAt(off uint64, length uint32) error {
-	log.Printf("MEMORY TRIM at:%d, %d bytes\n", off, length)
-	return nil
-}
-
-func (m *Memory) Size() uint64 {
-	return 100 * 1024 * 1024
-}
-
-func (m *Memory) Disconnect() {
+func (m *Memory) Release() {
 	log.Println("MEMORY DISCONNECT")
 }

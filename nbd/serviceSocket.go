@@ -17,7 +17,7 @@ func greeting(diskSize uint64) []byte {
 	copy(greeting[0:8], []byte("NBDMAGIC"))
 	binary.BigEndian.PutUint64(greeting[8:16], nbd_CLISERV_MAGIC)
 	binary.BigEndian.PutUint64(greeting[16:24], diskSize)
-	binary.BigEndian.PutUint32(greeting[24:28], nbd_FLAG_SEND_TRIM)
+	binary.BigEndian.PutUint32(greeting[24:28], 0)
 	return greeting
 }
 
@@ -68,15 +68,20 @@ func NewTCPSocketServer(ctx context.Context, store Storage, port int) error {
 		}
 
 		connCtx, connCancel := context.WithCancel(listenCtx)
-		// TODO: handle
-		go func() {
-			<-connCtx.Done()
-			fmt.Println("closing serer connection")
+		// pass in the connCtx and connCancel to avoid race with next loop iter
+		go func(c net.Conn, cancel func()) {
+			select {
+			case <-connCtx.Done():
+				fmt.Println("closing server connection")
+			case <-listenCtx.Done():
+				fmt.Println("closing server connection because listener closed")
+				cancel()
+			}
 			conn.Close()
-		}()
+		}(conn, connCancel)
 
 		fmt.Println("connection accepted, sending greeting")
-		greet := greeting(store.Size())
+		greet := greeting(diskSize)
 		if n, err := conn.Write(greet); err != nil || n != 152 {
 			fmt.Println("Failed to write greeting to client during negotiation, wrote", n, "of", len(greet), "bytes and error:", err)
 		} else {
@@ -92,9 +97,13 @@ func NewTCPSocketServer(ctx context.Context, store Storage, port int) error {
 
 func (ss serviceSocket) server() error {
 	fmt.Println("starting server")
-	mem := Memory{
-		data: make([]byte, ss.Storage.Size()),
+	store, err := NewFile()
+	if err != nil {
+		return err
 	}
+	//mem := Memory{
+	//	data: make([]byte, diskSize),
+	//}
 	for {
 		req := request(make([]byte, 28))
 		if n, err := io.ReadFull(ss, req); err != nil || n != 28 {
@@ -112,13 +121,13 @@ func (ss serviceSocket) server() error {
 		switch req.command() {
 		case nbd_CMD_DISC:
 			fmt.Println("Server is disconnecting by request of remote kernel")
-			mem.Disconnect()
+			store.Release()
 			return nil
 		case nbd_CMD_READ:
 			rep = newReply(req.handle())
 			replyData = make([]byte, req.len())
-			if err := mem.ReadAt(replyData, req.offset()); err != nil {
-				log.Println(err)
+			if err := store.ReadAt(replyData, req.offset()); err != nil {
+				log.Println("Error:", err)
 				// Reply with an EPERM
 				rep.err(1)
 				replyData = nil
@@ -130,13 +139,7 @@ func (ss serviceSocket) server() error {
 			if _, err := io.ReadFull(ss, respData); err != nil {
 				return fmt.Errorf("could not read request data for a remote device write: %w", err)
 			}
-			if err := mem.WriteAt(respData, req.offset()); err != nil {
-				log.Println("error for data written to device when writing to remote device:", err)
-				rep.err(1)
-			}
-		case nbd_CMD_TRIM:
-			rep = newReply(req.handle())
-			if err := mem.TrimAt(req.offset(), req.len()); err != nil {
+			if err := store.WriteAt(respData, req.offset()); err != nil {
 				log.Println("error for data written to device when writing to remote device:", err)
 				rep.err(1)
 			}
