@@ -1,6 +1,6 @@
 ## Testing
 
-I used [lima](https://github.com/lima-vm/lima)
+I used [lima](https://github.com/lima-vm/lima) (used by Rancher Desktop) running alpine on M1 Mac
 
 ```
 brew install lima

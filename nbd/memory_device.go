@@ -47,7 +47,7 @@ func (m *Memory) TrimAt(off uint64, length uint32) error {
 }
 
 func (m *Memory) Size() uint64 {
-	return 1 * 1024 * 1024
+	return 100 * 1024 * 1024
 }
 
 func (m *Memory) Disconnect() {

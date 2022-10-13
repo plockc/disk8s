@@ -49,11 +49,10 @@ func NewTCPSocketServer(ctx context.Context, store Storage, port int) error {
 	defer server.Close()
 
 	// handle external shutdown or internal shutdown
-	var cancel func()
-	ctx, cancel = context.WithCancel(ctx)
-	defer cancel()
+	listenCtx, listenCancel := context.WithCancel(ctx)
+	defer listenCancel()
 	go func() {
-		<-ctx.Done()
+		<-listenCtx.Done()
 		fmt.Println("begin gracefully shutting down server...")
 		server.Close()
 	}()
@@ -62,15 +61,17 @@ func NewTCPSocketServer(ctx context.Context, store Storage, port int) error {
 		conn, err := server.Accept()
 		if err != nil {
 			// TODO: fix
-			if ctx.Err() != nil && !errors.Is(ctx.Err(), context.Canceled) {
+			if listenCtx.Err() != nil && !errors.Is(listenCtx.Err(), context.Canceled) {
 				return nil
 			}
 			return err
 		}
 
+		connCtx, connCancel := context.WithCancel(listenCtx)
+		// TODO: handle
 		go func() {
-			<-ctx.Done()
-			fmt.Println("closing connection because context was cancelled")
+			<-connCtx.Done()
+			fmt.Println("closing serer connection")
 			conn.Close()
 		}()
 
@@ -85,8 +86,7 @@ func NewTCPSocketServer(ctx context.Context, store Storage, port int) error {
 				fmt.Println("Server handler exited with no error")
 			}
 		}
-		fmt.Println("server closing connection")
-		conn.Close()
+		connCancel()
 	}
 }
 
@@ -97,12 +97,12 @@ func (ss serviceSocket) server() error {
 	}
 	for {
 		req := request(make([]byte, 28))
-		if n, err := ss.Read(req); err != nil || n != 28 {
+		if n, err := io.ReadFull(ss, req); err != nil || n != 28 {
 			// if no error but not bytes, the connection was closed, exit the server
 			if errors.Is(err, io.EOF) && n == 0 {
 				return nil
 			}
-			return fmt.Errorf("local nbd server could not read request, got %d bytes: %w", n, err)
+			return fmt.Errorf("nbd server could not read request, got %d bytes: %w", n, err)
 		}
 		if req.magic() != nbd_REQUEST_MAGIC {
 			return fmt.Errorf("Fatal error: received packet with wrong Magic number")

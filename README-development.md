@@ -92,8 +92,35 @@ Initialize devspace
     - path: /go/pkg/mod/cache/download
   ```
 
+Create a disk
+```
+kubectl apply -f - <<EOF
+apiVersion: disk8s.plockc.org/v1alpha1
+kind: Disk
+metadata:
+  name: sample
+EOF
+```
+
 The initial compile takes a long time and will likely get killed once or twice, but then it will be stable.
 
 Consider setting up [autoReload](https://www.devspace.sh/docs/5.x/configuration/development/auto-reloading) for the deployment.
 
 Also consider setting up a special devspace manifest with larger runtime memory and CPU limits.
+
+### Updating generated code
+
+Steps to push updates, TODO: have devspace do this automatically
+
+```
+cd controller
+make manifests
+kustomize build config/default | gojq --yaml-input -s > ../environments/default/kustomized.json
+cd ../environments
+jsonnet --yaml-stream -J vendor -J lib default/disk8s.jsonnet  > default/disk8s.yaml
+```
+
+Exit the devspace shell
+```
+devspace dev
+```
