@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package nbd;
+
+option go_package = "github.com/plockc/ndb/internal/grpc";
+
+service DataDisk {
+    rpc Read(ReadReq) returns (ReadResp) {}
+    rpc Write(WriteReq) returns (Error) {}
+}
+
+message ReadReq {
+    int32 size = 1;
+    int64 offset = 2;
+}
+
+message WriteReq {
+    bytes data = 1;
+    int64 offset = 2;
+}
+
+message ReadResp {
+    bytes data = 1;
+    string error = 2;
+}
+
+message Error {
+    optional string error = 1;
+}
+

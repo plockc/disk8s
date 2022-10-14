@@ -1,4 +1,4 @@
-package nbd
+package store
 
 import (
 	"fmt"

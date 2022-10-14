@@ -1,3 +1,18 @@
+## gRPC
+
+Install protoc
+```
+brew install protobuf
+go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+```
+
+Update
+```
+protoc --go_out=internal/grpc/ --go_opt=paths=source_relative --go-grpc_opt=paths=source_relative --go-grpc_out=internal/grpc/ data-disk.proto
+```
+
+
 ## Testing
 
 I used [lima](https://github.com/lima-vm/lima) (used by Rancher Desktop) running alpine on M1 Mac

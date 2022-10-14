@@ -1,4 +1,4 @@
-package nbd
+package store
 
 type Storage interface {
 	ReadAt(p []byte, off uint64) error
