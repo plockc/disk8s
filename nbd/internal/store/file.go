@@ -79,3 +79,7 @@ func (f *File) Release() {
 	f.Close()
 	log.Println("FILE RELEASED")
 }
+
+func (f *File) Size() uint64 {
+	return diskSize
+}

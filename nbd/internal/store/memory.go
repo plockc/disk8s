@@ -44,3 +44,7 @@ func (m *Memory) WriteAt(p []byte, off uint64) error {
 func (m *Memory) Release() {
 	log.Println("MEMORY DISCONNECT")
 }
+
+func (m *Memory) Size() uint64 {
+	return uint64(len(m.data))
+}

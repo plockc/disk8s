@@ -11,6 +11,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/plockc/disk8s/nbd/internal/store"
 	"github.com/plockc/disk8s/nbd/replica"
 )
 
@@ -31,15 +32,39 @@ func main() {
 		return "Interrupt handler", nil
 	})
 
+	var serviceErr error
 	routines = append(routines, func() (string, error) {
-		replica.HandleRequests(ctx)
-		return "Data Disk", nil
+		fileStore, err := store.NewFile()
+		if err == nil {
+			err = replica.NewDataDiskServer(fileStore).HandleRequests(ctx)
+		}
+		return "Data Disk", err
 	})
+
+	for _, r := range routines {
+		f := r // get copy off the heap as r changes and we're spawning usage of r
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			label, err := f()
+			if err != nil {
+				fmt.Println(label, "exited with ERROR:", err)
+			} else {
+				fmt.Println(label, "exited cleanly")
+			}
+			cancel()
+		}()
+	}
 
 	// wait for routines to complete before exiting
 	wg.Wait()
 
 	cancelKill()
+
+	if serviceErr != nil {
+		fmt.Println("Exiting due to Error:", serviceErr)
+		os.Exit(1)
+	}
 }
 
 func handleSignal(ctx context.Context, cancel func()) {

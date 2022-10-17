@@ -4,7 +4,7 @@
 // - protoc             v3.21.7
 // source: data-disk.proto
 
-package grpc
+package replica
 
 import (
 	context "context"
@@ -23,7 +23,8 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DataDiskClient interface {
 	Read(ctx context.Context, in *ReadReq, opts ...grpc.CallOption) (*ReadResp, error)
-	Write(ctx context.Context, in *WriteReq, opts ...grpc.CallOption) (*Error, error)
+	// rpc Write(WriteReq) returns (Error) {}
+	Write(ctx context.Context, in *WriteReq, opts ...grpc.CallOption) (*WriteResp, error)
 }
 
 type dataDiskClient struct {
@@ -36,16 +37,16 @@ func NewDataDiskClient(cc grpc.ClientConnInterface) DataDiskClient {
 
 func (c *dataDiskClient) Read(ctx context.Context, in *ReadReq, opts ...grpc.CallOption) (*ReadResp, error) {
 	out := new(ReadResp)
-	err := c.cc.Invoke(ctx, "/nbd.DataDisk/Read", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/replica.DataDisk/Read", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *dataDiskClient) Write(ctx context.Context, in *WriteReq, opts ...grpc.CallOption) (*Error, error) {
-	out := new(Error)
-	err := c.cc.Invoke(ctx, "/nbd.DataDisk/Write", in, out, opts...)
+func (c *dataDiskClient) Write(ctx context.Context, in *WriteReq, opts ...grpc.CallOption) (*WriteResp, error) {
+	out := new(WriteResp)
+	err := c.cc.Invoke(ctx, "/replica.DataDisk/Write", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +58,8 @@ func (c *dataDiskClient) Write(ctx context.Context, in *WriteReq, opts ...grpc.C
 // for forward compatibility
 type DataDiskServer interface {
 	Read(context.Context, *ReadReq) (*ReadResp, error)
-	Write(context.Context, *WriteReq) (*Error, error)
+	// rpc Write(WriteReq) returns (Error) {}
+	Write(context.Context, *WriteReq) (*WriteResp, error)
 	mustEmbedUnimplementedDataDiskServer()
 }
 
@@ -68,7 +70,7 @@ type UnimplementedDataDiskServer struct {
 func (UnimplementedDataDiskServer) Read(context.Context, *ReadReq) (*ReadResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Read not implemented")
 }
-func (UnimplementedDataDiskServer) Write(context.Context, *WriteReq) (*Error, error) {
+func (UnimplementedDataDiskServer) Write(context.Context, *WriteReq) (*WriteResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Write not implemented")
 }
 func (UnimplementedDataDiskServer) mustEmbedUnimplementedDataDiskServer() {}
@@ -94,7 +96,7 @@ func _DataDisk_Read_Handler(srv interface{}, ctx context.Context, dec func(inter
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/nbd.DataDisk/Read",
+		FullMethod: "/replica.DataDisk/Read",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DataDiskServer).Read(ctx, req.(*ReadReq))
@@ -112,7 +114,7 @@ func _DataDisk_Write_Handler(srv interface{}, ctx context.Context, dec func(inte
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/nbd.DataDisk/Write",
+		FullMethod: "/replica.DataDisk/Write",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DataDiskServer).Write(ctx, req.(*WriteReq))
@@ -124,7 +126,7 @@ func _DataDisk_Write_Handler(srv interface{}, ctx context.Context, dec func(inte
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var DataDisk_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "nbd.DataDisk",
+	ServiceName: "replica.DataDisk",
 	HandlerType: (*DataDiskServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

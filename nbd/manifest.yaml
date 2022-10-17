@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ndb
+  namespace: disk8s-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nbd
+  template:
+    metadata:
+      labels:
+        app: nbd
+    spec:
+      containers:
+      - image: nbd-server:latest
+        imagePullPolicy: IfNotPresent
+        name: disk
+        ports:
+        - containerPort: 10809
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /data
+          name: data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: nbd
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nbd
+  namespace: disk8s-system
+spec:
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - port: 10809
+    protocol: TCP
+    targetPort: 10809
+  selector:
+    app: nbd
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nbd
+  namespace: disk8s-system
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+  volumeMode: Filesystem

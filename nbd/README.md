@@ -9,7 +9,7 @@ go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
 Update
 ```
-protoc --go_out=internal/grpc/ --go_opt=paths=source_relative --go-grpc_opt=paths=source_relative --go-grpc_out=internal/grpc/ data-disk.proto
+protoc --go_out=./replica --go_opt=paths=source_relative --go-grpc_opt=paths=source_relative --go-grpc_out=./replica data-disk.proto
 ```
 
 

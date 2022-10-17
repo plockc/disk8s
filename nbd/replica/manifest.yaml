@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: replica
+  namespace: disk8s-system
+spec:
+  selector:
+    matchLabels:
+      app: replica
+  serviceName: nbd
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: replica
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+      - image: replica:latest
+        imagePullPolicy: IfNotPresent
+        name: disk
+        ports:
+        - containerPort: 10808
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /data
+          name: data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 100Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: replica
+  namespace: disk8s-system
+spec:
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - port: 10808
+    protocol: TCP
+    targetPort: 10808
+  selector:
+    app: replica
+  type: ClusterIP
+#---
+#apiVersion: v1
+#kind: PersistentVolumeClaim
+#metadata:
+#  name: replica
+#  namespace: disk8s-system
+#spec:
+#  accessModes:
+#  - ReadWriteOnce
+#  resources:
+#    requests:
+#      storage: 100Mi
+#  volumeMode: Filesystem

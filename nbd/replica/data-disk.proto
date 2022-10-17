@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package replica;
+
+option go_package = "github.com/plockc/ndb/replica";
+
+service DataDisk {
+    rpc Read(ReadReq) returns (ReadResp) {}
+    //rpc Write(WriteReq) returns (Error) {}
+    rpc Write(WriteReq) returns (WriteResp) {}
+}
+
+message ReadReq {
+    uint32 size = 1;
+    uint64 offset = 2;
+}
+
+message WriteReq {
+    bytes data = 1;
+    uint64 offset = 2;
+}
+
+message ReadResp {
+    bytes data = 1;
+}
+
+message WriteResp {
+}

@@ -10,6 +10,8 @@ import (
 	"net"
 	"os"
 	"strconv"
+
+	"github.com/plockc/disk8s/nbd/internal/store"
 )
 
 func greeting(diskSize uint64) []byte {
@@ -23,23 +25,23 @@ func greeting(diskSize uint64) []byte {
 
 type serviceSocket struct {
 	io.ReadWriter
-	Storage
+	store.Storage
 }
 
-func NewDomainSocketServer(store Storage, domainSockets <-chan uintptr) error {
+func NewDomainSocketServer(storage store.Storage, domainSockets <-chan uintptr) error {
 	fmt.Println("server has been provided a domain socket")
 	var lastError error
 	for domainSocketDescriptor := range domainSockets {
 		service := serviceSocket{
 			ReadWriter: os.NewFile(domainSocketDescriptor, "unix"),
-			Storage:    store,
+			Storage:    storage,
 		}
 		lastError = service.server()
 	}
 	return lastError
 }
 
-func NewTCPSocketServer(ctx context.Context, store Storage, port int) error {
+func NewTCPSocketServer(ctx context.Context, store store.Storage, port int) error {
 	// listen for connections
 	server, err := net.Listen("tcp", ":"+strconv.Itoa(port))
 	if err != nil {
@@ -81,7 +83,7 @@ func NewTCPSocketServer(ctx context.Context, store Storage, port int) error {
 		}(conn, connCancel)
 
 		fmt.Println("connection accepted, sending greeting")
-		greet := greeting(diskSize)
+		greet := greeting(store.Size())
 		if n, err := conn.Write(greet); err != nil || n != 152 {
 			fmt.Println("Failed to write greeting to client during negotiation, wrote", n, "of", len(greet), "bytes and error:", err)
 		} else {
@@ -97,7 +99,7 @@ func NewTCPSocketServer(ctx context.Context, store Storage, port int) error {
 
 func (ss serviceSocket) server() error {
 	fmt.Println("starting server")
-	store, err := NewFile()
+	store, err := store.NewFile()
 	if err != nil {
 		return err
 	}

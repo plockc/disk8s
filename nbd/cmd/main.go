@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/plockc/disk8s/nbd"
+	"github.com/plockc/disk8s/nbd/internal/store"
 )
 
 func main() {
@@ -42,7 +43,7 @@ func main() {
 		routines = append(
 			routines,
 			func() (string, error) {
-				return "TCP Server", nbd.NewTCPSocketServer(ctx, nbd.NewMemory(), *port)
+				return "TCP Server", nbd.NewTCPSocketServer(ctx, store.NewMemory(), *port)
 			},
 		)
 	}
@@ -65,7 +66,7 @@ func main() {
 					return "Domain Socket Client", nbd.NewDomainSocketClient(ctx, *clientDevice, domainSockets)
 				},
 				func() (string, error) {
-					return "Domain Socket Server", nbd.NewDomainSocketServer(nbd.NewMemory(), domainSockets)
+					return "Domain Socket Server", nbd.NewDomainSocketServer(store.NewMemory(), domainSockets)
 				},
 			)
 		}
