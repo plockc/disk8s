@@ -49,3 +49,5 @@ busybox implementation [src](https://git.busybox.net/busybox/tree/networking/nbd
 [go-nbd](https://github.com/derlaft/go-nbd/blob/master/nbd.go) has a minimal implementation of an in memory client and server
 
 [gondbserver](https://github.com/abligh/gonbdserver)
+
+[BUSE thesis](https://dspace.cuni.cz/bitstream/handle/20.500.11956/148791/120397658.pdf)
