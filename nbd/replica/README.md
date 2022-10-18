@@ -10,7 +10,7 @@ go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 Update generated code
 ```
 cd replica
-protoc --go_out=./ --go_opt=paths=source_relative --go-grpc_opt=paths=source_relative --go-grpc_out=./ data-disk.proto
+devspace run protobuf
 ```
 
 ## Development
@@ -27,6 +27,7 @@ devspace.yaml has already been updated to
 - persist go module downloads
 - labels selector to only work with the manifest
 - skip pushing image to docker hub and use parent dir for docker context
+- `devspace run protobuf` command to update the generate client, server, and messages
 
 ```
 workingDir: /app/replica
@@ -56,7 +57,7 @@ Then run the binary
 go run ./cmd
 ```
 
-Then edit locally, and Ctrl-C the process to pick up changes
+Then edit locally, and Ctrl-C tnd rerun to pick up code changes.
 
 ## Debug
 

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"fmt"
 	"log"
 )
@@ -17,7 +18,7 @@ func NewMemory() Storage {
 	return &m
 }
 
-func (m *Memory) ReadAt(p []byte, off uint64) error {
+func (m *Memory) ReadAt(_ context.Context, p []byte, off uint64) error {
 	if int(off)+len(p) > len(m.data) {
 		return fmt.Errorf(
 			"cannot read %d bytes starting at %d with disk size %d",
@@ -29,7 +30,7 @@ func (m *Memory) ReadAt(p []byte, off uint64) error {
 	return nil
 }
 
-func (m *Memory) WriteAt(p []byte, off uint64) error {
+func (m *Memory) WriteAt(_ context.Context, p []byte, off uint64) error {
 	if int(off)+len(p) > len(m.data) {
 		return fmt.Errorf(
 			"cannot write %d bytes starting at %d with disk size %d",
@@ -45,6 +46,6 @@ func (m *Memory) Release() {
 	log.Println("MEMORY DISCONNECT")
 }
 
-func (m *Memory) Size() uint64 {
-	return uint64(len(m.data))
+func (m *Memory) Size(_ context.Context) (uint64, error) {
+	return uint64(len(m.data)), nil
 }

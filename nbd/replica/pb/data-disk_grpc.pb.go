@@ -4,7 +4,7 @@
 // - protoc             v3.21.7
 // source: data-disk.proto
 
-package replica
+package pb
 
 import (
 	context "context"
@@ -23,8 +23,8 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DataDiskClient interface {
 	Read(ctx context.Context, in *ReadReq, opts ...grpc.CallOption) (*ReadResp, error)
-	// rpc Write(WriteReq) returns (Error) {}
 	Write(ctx context.Context, in *WriteReq, opts ...grpc.CallOption) (*WriteResp, error)
+	Size(ctx context.Context, in *SizeReq, opts ...grpc.CallOption) (*SizeResp, error)
 }
 
 type dataDiskClient struct {
@@ -53,13 +53,22 @@ func (c *dataDiskClient) Write(ctx context.Context, in *WriteReq, opts ...grpc.C
 	return out, nil
 }
 
+func (c *dataDiskClient) Size(ctx context.Context, in *SizeReq, opts ...grpc.CallOption) (*SizeResp, error) {
+	out := new(SizeResp)
+	err := c.cc.Invoke(ctx, "/replica.DataDisk/Size", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DataDiskServer is the server API for DataDisk service.
 // All implementations must embed UnimplementedDataDiskServer
 // for forward compatibility
 type DataDiskServer interface {
 	Read(context.Context, *ReadReq) (*ReadResp, error)
-	// rpc Write(WriteReq) returns (Error) {}
 	Write(context.Context, *WriteReq) (*WriteResp, error)
+	Size(context.Context, *SizeReq) (*SizeResp, error)
 	mustEmbedUnimplementedDataDiskServer()
 }
 
@@ -72,6 +81,9 @@ func (UnimplementedDataDiskServer) Read(context.Context, *ReadReq) (*ReadResp, e
 }
 func (UnimplementedDataDiskServer) Write(context.Context, *WriteReq) (*WriteResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Write not implemented")
+}
+func (UnimplementedDataDiskServer) Size(context.Context, *SizeReq) (*SizeResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Size not implemented")
 }
 func (UnimplementedDataDiskServer) mustEmbedUnimplementedDataDiskServer() {}
 
@@ -122,6 +134,24 @@ func _DataDisk_Write_Handler(srv interface{}, ctx context.Context, dec func(inte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DataDisk_Size_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SizeReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DataDiskServer).Size(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/replica.DataDisk/Size",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DataDiskServer).Size(ctx, req.(*SizeReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DataDisk_ServiceDesc is the grpc.ServiceDesc for DataDisk service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -136,6 +166,10 @@ var DataDisk_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Write",
 			Handler:    _DataDisk_Write_Handler,
+		},
+		{
+			MethodName: "Size",
+			Handler:    _DataDisk_Size_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

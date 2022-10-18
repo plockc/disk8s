@@ -50,16 +50,3 @@ spec:
   selector:
     app: replica
   type: ClusterIP
-#---
-#apiVersion: v1
-#kind: PersistentVolumeClaim
-#metadata:
-#  name: replica
-#  namespace: disk8s-system
-#spec:
-#  accessModes:
-#  - ReadWriteOnce
-#  resources:
-#    requests:
-#      storage: 100Mi
-#  volumeMode: Filesystem

@@ -33,7 +33,10 @@ import (
 	disk8sv1alpha1 "github.com/plockc/disk8s/disk8s-controller/api/v1alpha1"
 )
 
-const replicatedDiskPrefix = "nbd-server"
+const (
+	replicatedDiskPrefix = "nbd-server"
+	replicaDiskPrefix    = "replica"
+)
 
 // DiskReconciler reconciles a Disk object
 type DiskReconciler struct {
@@ -47,6 +50,7 @@ type DiskReconciler struct {
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -62,6 +66,7 @@ func (r *DiskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 	l.Info("reconciling")
 
+	namespace := os.Getenv("K8S_POD_NAMESPACE")
 	var disk disk8sv1alpha1.Disk
 	if err := r.Get(ctx, req.NamespacedName, &disk); err != nil {
 		l.Info("Disk " + req.Name + " has been deleted")
@@ -71,56 +76,73 @@ func (r *DiskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	///////////
 	// Ensure Persistent Volume Claim for Replicated Disk
 	///////////
-	pvcName := "nbd-0-" + req.Name
-	oMeta := metav1.ObjectMeta{Name: pvcName, Namespace: os.Getenv("K8S_POD_NAMESPACE")}
-	var pvc = corev1.PersistentVolumeClaim{ObjectMeta: oMeta}
-	res, err := controllerutil.CreateOrUpdate(ctx, r.Client, &pvc, func() error {
-		size, err := resource.ParseQuantity("100Mi")
-		if err != nil {
-			return err
-		}
-		mutateNbdServerPersistentVolumeClaim(&pvc, size)
-		controllerutil.SetControllerReference(&disk, &pvc, r.Scheme)
-		return nil
-	})
+	size, err := resource.ParseQuantity("100Mi")
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	l.Info("Replicated Disk Persistent Volume " + string(res))
+	oMeta := metav1.ObjectMeta{Name: "nbd-" + req.Name, Namespace: namespace}
+	var pvc = corev1.PersistentVolumeClaim{ObjectMeta: oMeta}
+	if err = createOrUpdate(ctx, r, &disk, &pvc, func(pvc *corev1.PersistentVolumeClaim, _, name string) {
+		mutateNbdServerPersistentVolumeClaim(pvc, size)
+	}); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	///////////
 	// Ensure Deployment for Replicated Disk
 	///////////
-	deployName := replicatedDiskPrefix + "-" + req.Name
-	oMeta = metav1.ObjectMeta{Name: deployName, Namespace: os.Getenv("K8S_POD_NAMESPACE")}
+	oMeta = metav1.ObjectMeta{Name: replicatedDiskPrefix + "-" + req.Name, Namespace: namespace}
 	var deploy = appsv1.Deployment{ObjectMeta: oMeta}
-	res, err = controllerutil.CreateOrUpdate(ctx, r.Client, &deploy, func() error {
-		mutateNbdServerDeployment(&deploy, req.Name, pvcName)
-		controllerutil.SetControllerReference(&disk, &deploy, r.Scheme)
-		return nil
-	})
-	if err != nil {
+	if err = createOrUpdate(ctx, r, &disk, &deploy, func(deploy *appsv1.Deployment, diskName, _ string) {
+		mutateNbdServerDeployment(deploy, req.Name, pvc.GetName())
+	}); err != nil {
 		return ctrl.Result{}, err
 	}
-	l.Info("Replicated Disk Deployment " + string(res))
 
 	///////////
 	// Ensure Service for Replicated Disk
 	///////////
-	serviceName := "nbd-" + req.Name
-	oMeta = metav1.ObjectMeta{Name: serviceName, Namespace: os.Getenv("K8S_POD_NAMESPACE")}
+	oMeta = metav1.ObjectMeta{Name: "nbd-" + req.Name, Namespace: namespace}
 	var svc = corev1.Service{ObjectMeta: oMeta}
-	res, err = controllerutil.CreateOrUpdate(ctx, r.Client, &svc, func() error {
-		mutateNbdServerService(&svc, req.Name)
-		controllerutil.SetControllerReference(&disk, &svc, r.Scheme)
-		return nil
-	})
-	if err != nil {
+	if err = createOrUpdate(ctx, r, &disk, &svc, mutateNbdServerService); err != nil {
 		return ctrl.Result{}, err
 	}
-	l.Info("Replicated Disk Service " + string(res))
+
+	///////////
+	// Ensure StatefulSet for Replica (Data) Disk
+	///////////
+	oMeta = metav1.ObjectMeta{Name: replicaDiskPrefix + "-" + req.Name, Namespace: namespace}
+	ss := appsv1.StatefulSet{ObjectMeta: oMeta}
+	if err = createOrUpdate(ctx, r, &disk, &ss, func(ss *appsv1.StatefulSet, diskName, _ string) {
+		mutateReplicaStatefulSet(ss, diskName, size)
+	}); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	///////////
+	// Ensure Service for Replica (Data) Disk
+	///////////
+	oMeta = metav1.ObjectMeta{Name: "replica-" + req.Name, Namespace: namespace}
+	svc = corev1.Service{ObjectMeta: oMeta}
+	if err = createOrUpdate(ctx, r, &disk, &svc, mutateReplicaService); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
+}
+
+// expects the Metadata is already set for Name and GVK for the object
+func createOrUpdate[Obj client.Object](ctx context.Context, r *DiskReconciler, disk client.Object, o Obj, mutator func(o Obj, diskName, name string)) error {
+	l := log.FromContext(ctx)
+	res, err := controllerutil.CreateOrUpdate(ctx, r.Client, o, func() error {
+		mutator(o, disk.GetName(), o.GetName())
+		return controllerutil.SetControllerReference(disk, o, r.Scheme)
+	})
+	if err != nil {
+		return err
+	}
+	l.Info(o.GetObjectKind().GroupVersionKind().Kind + " " + o.GetName() + " " + string(res))
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -130,7 +152,7 @@ func (r *DiskReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func mutateNbdServerPersistentVolumeClaim(pvc *corev1.PersistentVolumeClaim, size resource.Quantity) {
+func mutateReplicaPersistentVolumeClaim(pvc *corev1.PersistentVolumeClaim, size resource.Quantity) {
 	fs := corev1.PersistentVolumeFilesystem
 	pvc.Spec = corev1.PersistentVolumeClaimSpec{
 		AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
@@ -143,7 +165,115 @@ func mutateNbdServerPersistentVolumeClaim(pvc *corev1.PersistentVolumeClaim, siz
 	}
 }
 
-func mutateNbdServerService(svc *corev1.Service, diskName string) {
+func mutateReplicaService(svc *corev1.Service, diskName, _ string) {
+	nbd := "nbd"
+	serviceType := corev1.ServiceInternalTrafficPolicyCluster
+	// external traffic coming in will try to use the local node
+	// PureLB documents this is supported - see External Traffic Policy section
+	// https://purelb.gitlab.io/docs/how_it_works/
+	// slightly dated kubernetes reference:
+	// https://www.asykim.com/blog/deep-dive-into-kubernetes-external-traffic-policies
+	svc.Spec = corev1.ServiceSpec{
+		Type:                  corev1.ServiceTypeClusterIP,
+		InternalTrafficPolicy: &serviceType,
+		IPFamilies:            []corev1.IPFamily{corev1.IPv4Protocol},
+		Ports: []corev1.ServicePort{
+			{
+				AppProtocol: &nbd,
+				Name:        "nbd",
+				Port:        10808,
+			},
+		},
+		Selector: map[string]string{
+			"app.kubernetes.io/name":      "disk8s-storage",
+			"app.kubernetes.io/instance":  diskName,
+			"app.kubernetes.io/component": "storage-replica",
+		},
+	}
+}
+
+func mutateReplicaStatefulSet(ss *appsv1.StatefulSet, diskName string, size resource.Quantity) {
+	var replicas int32 = 1
+	var termGracePeriod int64 = 10
+	fs := corev1.PersistentVolumeFilesystem
+	name := "replica-" + diskName
+	ss.Spec = appsv1.StatefulSetSpec{
+		Replicas: &replicas,
+		Selector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				"app.kubernetes.io/name":      "disk8s-storage",
+				"app.kubernetes.io/instance":  diskName,
+				"app.kubernetes.io/component": "storage-replica",
+				"app.kubernetes.io/part-of":   "replicated-disk",
+			},
+		},
+		ServiceName: name,
+		PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+			WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+			WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+		},
+		Template: corev1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					"app.kubernetes.io/name":      "disk8s-storage",
+					"app.kubernetes.io/instance":  diskName,
+					"app.kubernetes.io/component": "storage-replica",
+					"app.kubernetes.io/part-of":   "replicated-disk",
+				},
+			},
+			Spec: corev1.PodSpec{
+				TerminationGracePeriodSeconds: &termGracePeriod,
+				Containers: []corev1.Container{
+					{
+						Name:            "disk",
+						Image:           "replica:latest",
+						ImagePullPolicy: corev1.PullIfNotPresent,
+						Ports: []corev1.ContainerPort{
+							{
+								Name:          "grpc",
+								Protocol:      corev1.ProtocolTCP,
+								ContainerPort: 10808,
+							},
+						},
+						VolumeMounts: []corev1.VolumeMount{{
+							Name: "data", MountPath: "/data",
+						}},
+					},
+				},
+			},
+		},
+		VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "data",
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+					VolumeMode:  &fs,
+					Resources: corev1.ResourceRequirements{
+						Requests: map[corev1.ResourceName]resource.Quantity{
+							corev1.ResourceStorage: size,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func mutateNbdServerPersistentVolumeClaim(pvc *corev1.PersistentVolumeClaim, size resource.Quantity) {
+	fs := corev1.PersistentVolumeFilesystem
+	// the pvc.Spec can be modified by k8s controllers, so just modify fields we manage
+	pvc.Spec.AccessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
+	pvc.Spec.VolumeMode = &fs
+	pvc.Spec.Resources = corev1.ResourceRequirements{
+		Requests: map[corev1.ResourceName]resource.Quantity{
+			corev1.ResourceStorage: size,
+		},
+	}
+}
+
+func mutateNbdServerService(svc *corev1.Service, diskName, _ string) {
 	f := false
 	nbd := "nbd"
 	// external traffic coming in will try to use the local node
@@ -190,6 +320,7 @@ func mutateNbdServerDeployment(deploy *appsv1.Deployment, diskName, pvcName stri
 						Name:            "disk",
 						Image:           "nbd-server:latest",
 						ImagePullPolicy: corev1.PullIfNotPresent,
+						Env:             []corev1.EnvVar{{Name: "REMOTE_STORAGE", Value: "replica-" + diskName + "-0.replica-sample:10808"}},
 						Ports: []corev1.ContainerPort{
 							{
 								Name:          "nbd",

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"io"
 	"log"
 	"os"
@@ -57,7 +58,7 @@ func NewFile() (Storage, error) {
 	return &File{file}, nil
 }
 
-func (f *File) ReadAt(p []byte, off uint64) error {
+func (f *File) ReadAt(_ context.Context, p []byte, off uint64) error {
 	log.Printf("FILE READ at:%d, %d bytes\n", off, len(p))
 	if _, err := f.Seek(int64(off), 0); err != nil {
 		return err
@@ -66,7 +67,7 @@ func (f *File) ReadAt(p []byte, off uint64) error {
 	return err
 }
 
-func (f *File) WriteAt(p []byte, off uint64) error {
+func (f *File) WriteAt(_ context.Context, p []byte, off uint64) error {
 	log.Printf("FILE WRITE at:%d, %d bytes\n", off, len(p))
 	if _, err := f.Seek(int64(off), 0); err != nil {
 		return err
@@ -80,6 +81,6 @@ func (f *File) Release() {
 	log.Println("FILE RELEASED")
 }
 
-func (f *File) Size() uint64 {
-	return diskSize
+func (f *File) Size(_ context.Context) (uint64, error) {
+	return diskSize, nil
 }

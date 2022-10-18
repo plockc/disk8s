@@ -19,7 +19,7 @@ RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
 COPY ./replica/data-disk.proto ./replica/
 
-RUN protoc --go_out=./ --go_opt=paths=source_relative --go-grpc_opt=paths=source_relative --go-grpc_out=./ replica/data-disk.proto
+RUN protoc --go_out=./pb --go_opt=paths=source_relative --go-grpc_opt=paths=source_relative --go-grpc_out=./pb replica/data-disk.proto
 
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
@@ -27,7 +27,7 @@ RUN go mod download
 
 # Copy the go source
 COPY replica/cmd/ replica/cmd/
-COPY ./replica/*.go ./replica/
+COPY ./replica/*.go  ./replica/pb ./replica/
 COPY ./internal/ internal/
 
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -a -o replica/replica replica/cmd/main.go

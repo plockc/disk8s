@@ -28,7 +28,7 @@ type serviceSocket struct {
 	store.Storage
 }
 
-func NewDomainSocketServer(storage store.Storage, domainSockets <-chan uintptr) error {
+func NewDomainSocketServer(ctx context.Context, storage store.Storage, domainSockets <-chan uintptr) error {
 	fmt.Println("server has been provided a domain socket")
 	var lastError error
 	for domainSocketDescriptor := range domainSockets {
@@ -36,7 +36,7 @@ func NewDomainSocketServer(storage store.Storage, domainSockets <-chan uintptr) 
 			ReadWriter: os.NewFile(domainSocketDescriptor, "unix"),
 			Storage:    storage,
 		}
-		lastError = service.server()
+		lastError = service.server(ctx)
 	}
 	return lastError
 }
@@ -82,30 +82,33 @@ func NewTCPSocketServer(ctx context.Context, store store.Storage, port int) erro
 			conn.Close()
 		}(conn, connCancel)
 
-		fmt.Println("connection accepted, sending greeting")
-		greet := greeting(store.Size())
-		if n, err := conn.Write(greet); err != nil || n != 152 {
-			fmt.Println("Failed to write greeting to client during negotiation, wrote", n, "of", len(greet), "bytes and error:", err)
-		} else {
-			if err := (serviceSocket{conn, store}).server(); err != nil {
-				fmt.Println("Server connection exited with ERROR:", err)
-			} else {
-				fmt.Println("Server handler exited with no error")
+		// want to make sure the connection is cancelled, so make inline func with defer close
+		func() {
+			defer connCancel()
+
+			fmt.Println("connection accepted, sending greeting")
+			size, err := store.Size(connCtx)
+			if err != nil {
+				fmt.Println("Failed to determine size of storage, cannot write greeting to client during negotiation, error:", err)
+				return
 			}
-		}
-		connCancel()
+			greet := greeting(size)
+			if n, err := conn.Write(greet); err != nil || n != 152 {
+				fmt.Println("Failed to write greeting to client during negotiation, wrote", n, "of", len(greet), "bytes and error:", err)
+				return
+			} else {
+				if err := (serviceSocket{conn, store}).server(connCtx); err != nil {
+					fmt.Println("Server connection exited with ERROR:", err)
+				} else {
+					fmt.Println("Server handler exited with no error")
+				}
+			}
+		}()
 	}
 }
 
-func (ss serviceSocket) server() error {
+func (ss serviceSocket) server(ctx context.Context) error {
 	fmt.Println("starting server")
-	store, err := store.NewFile()
-	if err != nil {
-		return err
-	}
-	//mem := Memory{
-	//	data: make([]byte, diskSize),
-	//}
 	for {
 		req := request(make([]byte, 28))
 		if n, err := io.ReadFull(ss, req); err != nil || n != 28 {
@@ -123,12 +126,12 @@ func (ss serviceSocket) server() error {
 		switch req.command() {
 		case nbd_CMD_DISC:
 			fmt.Println("Server is disconnecting by request of remote kernel")
-			store.Release()
+			ss.Storage.Release()
 			return nil
 		case nbd_CMD_READ:
 			rep = newReply(req.handle())
 			replyData = make([]byte, req.len())
-			if err := store.ReadAt(replyData, req.offset()); err != nil {
+			if err := ss.Storage.ReadAt(ctx, replyData, req.offset()); err != nil {
 				log.Println("Error:", err)
 				// Reply with an EPERM
 				rep.err(1)
@@ -141,7 +144,7 @@ func (ss serviceSocket) server() error {
 			if _, err := io.ReadFull(ss, respData); err != nil {
 				return fmt.Errorf("could not read request data for a remote device write: %w", err)
 			}
-			if err := store.WriteAt(respData, req.offset()); err != nil {
+			if err := ss.Storage.WriteAt(ctx, respData, req.offset()); err != nil {
 				log.Println("error for data written to device when writing to remote device:", err)
 				rep.err(1)
 			}

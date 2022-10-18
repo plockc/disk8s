@@ -1,0 +1,9 @@
+apiVersion: disk8s.plockc.org/v1alpha1
+kind: Disk
+metadata:
+  labels:
+    app.kubernetes.io/name: nbd
+    app.kubernetes.io/instance: sample
+  name: sample
+spec:
+  # TODO(user): Add fields here

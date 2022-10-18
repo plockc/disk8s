@@ -16,17 +16,44 @@ import (
 	"github.com/plockc/disk8s/nbd/internal/store"
 )
 
+func usage() {
+	for _, s := range []string{
+		"Usage of " + os.Args[0] + ":",
+		"A Network Block Device (NBD).",
+		"Set environment variable REMOTE_STORAGE=host:port to connect via grpc.",
+	} {
+		fmt.Fprintf(flag.CommandLine.Output(), s)
+	}
+	flag.PrintDefaults()
+}
+
 func main() {
 	killCtx, cancelKill := context.WithCancel(context.Background())
 	go handleKill(killCtx)
+	defer cancelKill()
 
 	clientDevice := flag.String("client", "", "spawns an nbd client on given device path (e.g. /dev/nbd0) to connect to server over unix socket")
 	tcp := flag.Bool("tcp", false, "use tcp for client and server, if no client, tcp is automatic")
 	port := flag.Int("port", 10809, "port for TCP server on all interfaces")
+	flag.Usage = usage
+
+	remote := os.Getenv("REMOTE_STORAGE")
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	flag.Parse()
+
+	var storage store.Storage
+	if remote != "" {
+		var err error
+		storage, err = store.NewRemote(remote)
+		if err != nil {
+			fmt.Println("Failed to Set up Remote Store:", err)
+			os.Exit(1)
+		}
+	} else {
+		storage = store.NewMemory()
+	}
 
 	wg := sync.WaitGroup{}
 
@@ -43,7 +70,7 @@ func main() {
 		routines = append(
 			routines,
 			func() (string, error) {
-				return "TCP Server", nbd.NewTCPSocketServer(ctx, store.NewMemory(), *port)
+				return "TCP Server", nbd.NewTCPSocketServer(ctx, storage, *port)
 			},
 		)
 	}
@@ -66,7 +93,7 @@ func main() {
 					return "Domain Socket Client", nbd.NewDomainSocketClient(ctx, *clientDevice, domainSockets)
 				},
 				func() (string, error) {
-					return "Domain Socket Server", nbd.NewDomainSocketServer(store.NewMemory(), domainSockets)
+					return "Domain Socket Server", nbd.NewDomainSocketServer(ctx, storage, domainSockets)
 				},
 			)
 		}
@@ -89,8 +116,6 @@ func main() {
 
 	// wait for routines to complete before exiting
 	wg.Wait()
-
-	cancelKill()
 }
 
 func handleSignal(ctx context.Context, cancel func()) {

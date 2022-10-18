@@ -94,12 +94,7 @@ Initialize devspace
 
 Create a disk
 ```
-kubectl apply -f - <<EOF
-apiVersion: disk8s.plockc.org/v1alpha1
-kind: Disk
-metadata:
-  name: sample
-EOF
+kubectl apply -f controller/config/samples/disk.yaml
 ```
 
 The initial compile takes a long time and will likely get killed once or twice, but then it will be stable.
