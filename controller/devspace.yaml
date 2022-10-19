@@ -17,6 +17,7 @@ pipelines:
       run_dependencies --all                            # 1. Deploy any projects this project needs (see "dependencies")
       build_images --all -t $(git describe --always)    # 2. Build, tag (git commit hash) and push all images (see "images")
       create_deployments --all                          # 3. Deploy Helm charts and manifests specfied as "deployments"
+      devspace run apply-sample-disk
 
 # This is a list of `images` that DevSpace can build for this project
 # We recommend to skip image building during development (devspace dev) as much as possible
@@ -65,10 +66,12 @@ dev:
 
 # Use the `commands` section to define repeatable dev workflows for this project 
 commands:
-  migrate-db:
+  apply-sample-disk:
     command: |-
-      echo 'This is a cross-platform, shared command that can be used to codify any kind of dev task.'
-      echo 'Anyone using this project can invoke it via "devspace run migrate-db"'
+      kubectl apply -f config/samples/disk.yaml
+  remove-sample-disk:
+    command: |-
+      kubectl delete -f config/samples/disk.yaml
   manifest:
     command: |-
       make manifests
@@ -79,10 +82,6 @@ commands:
       jsonnet --yaml-stream -J vendor -J lib default/disk8s.jsonnet  > default/disk8s.yaml
       echo manifest updated at default/disk8s.yaml
 
-# Define dependencies to other projects with a devspace.yaml
-# dependencies:
-#   api:
-#     git: https://...  # Git-based dependencies
-#     tag: v1.0.0
-#   ui:
-#     path: ./ui        # Path-based dependencies (for monorepos)
+dependencies:
+  nbd:
+    path: ./nbd        # Path-based dependencies (for monorepos)
