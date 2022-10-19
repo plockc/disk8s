@@ -7,21 +7,27 @@ pipelines:
   dev:
     run: |-
       run_dependencies --all       # 1. Deploy any projects this project needs (see "dependencies")
-      create_deployments --all     # 2. Deploy Helm charts and manifests specfied as "deployments"
       devspace run protobuf
       start_dev app                # 3. Start dev mode "app" (see "dev" section)
   # You can run this pipeline via `devspace deploy` (or `devspace run-pipeline deploy`)
   deploy:
     run: |-
-      run_dependencies --all                            # 1. Deploy any projects this project needs (see "dependencies")
-      build_images --all -t $(git describe --always)    # 2. Build, tag (git commit hash) and push all images (see "images")
-      create_deployments --all                          # 3. Deploy Helm charts and manifests specfied as "deployments"
+      # this container deployed through parent controller, so just build the image so it is ready
+      run_pipelines build
+  # You can run this pipeline via `devspace build` (or `devspace run-pipeline build`)
+  build:
+    run: |-
+      run_pipelines protobuf
+      build_images --all
+  protobuf:
+    run: |-
+      devspace run protobuf
 
 # This is a list of `images` that DevSpace can build for this project
 # We recommend to skip image building during development (devspace dev) as much as possible
 images:
   app:
-    image: replica:latest
+    image: plockc/replica:latest
     skipPush: true
     dockerfile: ../Dockerfile.replica
     context: ../
@@ -63,11 +69,3 @@ commands:
     command: |-
       mkdir -p ./pb
       protoc --go_out=./pb --go_opt=paths=source_relative --go-grpc_opt=paths=source_relative --go-grpc_out=./pb data-disk.proto
-
-# Define dependencies to other projects with a devspace.yaml
-# dependencies:
-#   api:
-#     git: https://...  # Git-based dependencies
-#     tag: v1.0.0
-#   ui:
-#     path: ./ui        # Path-based dependencies (for monorepos)

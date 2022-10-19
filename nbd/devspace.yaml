@@ -12,15 +12,22 @@ pipelines:
   # You can run this pipeline via `devspace deploy` (or `devspace run-pipeline deploy`)
   deploy:
     run: |-
-      run_dependencies --all                            # 1. Deploy any projects this project needs (see "dependencies")
-      build_images --all -t $(git describe --always)    # 2. Build, tag (git commit hash) and push all images (see "images")
-      create_deployments --all                          # 3. Deploy Helm charts and manifests specfied as "deployments"
+      run_dependencies --all       # 1. Deploy any projects this project needs (see "dependencies")
+      # this container deployed through parent controller, so just build the image so it is ready
+      devspace run_pipeline build
+  build:
+    run: |-
+      run_pipeline protobuf
+      build_images --all
+  protobuf:
+    run: |-
+      run_dependency_pipelines --pipeline protobuf replica
 
 # This is a list of `images` that DevSpace can build for this project
 # We recommend to skip image building during development (devspace dev) as much as possible
 images:
   app:
-    image: nbd-server:latest
+    image: plockc/nbd-server:latest
     dockerfile: ./Dockerfile
     skipPush: true
 
@@ -56,15 +63,9 @@ dev:
 
 # Use the `commands` section to define repeatable dev workflows for this project 
 commands:
-  migrate-db:
-    command: |-
-      echo 'This is a cross-platform, shared command that can be used to codify any kind of dev task.'
-      echo 'Anyone using this project can invoke it via "devspace run migrate-db"'
+  protobuf:
+    command: devspace run-pipeline protobuf
 
-# Define dependencies to other projects with a devspace.yaml
-# dependencies:
-#   api:
-#     git: https://...  # Git-based dependencies
-#     tag: v1.0.0
-#   ui:
-#     path: ./ui        # Path-based dependencies (for monorepos)
+dependencies:
+  replica:
+    path: ./replica

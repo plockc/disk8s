@@ -18,7 +18,7 @@ kubebuilder create api --group disk8s --version v1alpha1 --kind Disk --resource 
 - PLATFORMS to drop `s390x` and `ppc64le` to save time for rare deployments when using build-dockerx, keeps raspi 64 support however
 
 `config/default/kustomize.yaml` change:
-- `namespace` should be set to project name `disk8s`
+- `namespace` should be set to project name `disk8s-system`
 - `namePrefix` should be set to project name with a dash: `disk8s-`
 
 Updated spec and status in api/<version>/disk_types.go

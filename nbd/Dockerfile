@@ -9,18 +9,16 @@ RUN mkdir /data
 RUN chown 65532:65532 /data
 
 WORKDIR /workspace
-# Copy the Go Modules manifests
-COPY go.mod go.mod
-
-# have no dependencies,yet
-# COPY go.sum go.sum
 
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
+COPY go.mod go.sum ./
 RUN go mod download
 
 # Copy the go source
 COPY cmd/ cmd/
+COPY replica/pb/ replica/pb/
+COPY internal/store internal/store/
 COPY ./*.go ./
 
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -a -o nbd-server cmd/main.go
