@@ -226,7 +226,7 @@ func mutateReplicaStatefulSet(ss *appsv1.StatefulSet, diskName string, size reso
 				Containers: []corev1.Container{
 					{
 						Name:            "disk",
-						Image:           "replica:latest",
+						Image:           "plockc/replica:latest",
 						ImagePullPolicy: corev1.PullIfNotPresent,
 						Ports: []corev1.ContainerPort{
 							{
@@ -318,7 +318,7 @@ func mutateNbdServerDeployment(deploy *appsv1.Deployment, diskName, pvcName stri
 				Containers: []corev1.Container{
 					{
 						Name:            "disk",
-						Image:           "nbd-server:latest",
+						Image:           "plockc/nbd-server:latest",
 						ImagePullPolicy: corev1.PullIfNotPresent,
 						Env:             []corev1.EnvVar{{Name: "REMOTE_STORAGE", Value: "replica-" + diskName + "-0.replica-sample:10808"}},
 						Ports: []corev1.ContainerPort{
