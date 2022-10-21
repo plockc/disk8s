@@ -27,7 +27,7 @@ pipelines:
   push:
     run: |-
       echo Checking git
-      git diff --quiet || echo Workspace is dirty && exit 1
+      git diff --quiet || { echo Workspace is dirty && exit 1; }
       # test that it works first
       run_dependency_pipelines --pipeline build-all nbd
       build_images --all --skip-push
