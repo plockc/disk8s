@@ -11,7 +11,10 @@ local kustomized = import "kustomized.json";
   local gitVer = if std.extVar("gitVer") == "" then "latest" else std.extVar("gitVer"),
 
   deployment: deploy.new(name="disk8s-controller", replicas=1, containers=[
-    controllerContainer.new("manager", "plockc/"+$._config.name+":"+gitVer),
+    controllerContainer.new("manager", "plockc/"+$._config.name+":"+gitVer)
+    +k.core.v1.container.withEnvMixin([
+        k.core.v1.envVar.new("GIT_VERSION", gitVer),
+    ]),
   ])
   //+deploy.spec.template.spec.securityContext.withRunAsNonRoot(true)
   +deploy.spec.template.spec.withTerminationGracePeriodSeconds(10)

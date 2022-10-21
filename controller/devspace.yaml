@@ -6,26 +6,22 @@ pipelines:
   # This is the pipeline for the main command: `devspace dev` (or `devspace run-pipeline dev`)
   dev:
     run: |-
-      run_dependencies --all       # 1. Deploy any projects this project needs (see "dependencies")
       devspace run manifest
       create_deployments --all     # 2. Deploy Helm charts and manifests specfied as "deployments"
       start_dev app                # 3. Start dev mode "app" (see "dev" section)
   # You can run this pipeline via `devspace deploy` (or `devspace run-pipeline deploy`)
   deploy:
     run: |-
-      run_dependencies --all                            # 1. Deploy any projects this project needs (see "dependencies")
-      build_images --all -t $(git describe --always)    # 2. Build, tag (git commit hash) and push all images (see "images")
+      build_images --skip-push --all -t $(git describe --always)    # 2. Build, tag (git commit hash) and push all images (see "images")
       create_deployments --all                          # 3. Deploy Helm charts and manifests specfied as "deployments"
       devspace run apply-sample-disk
   build:
     run: |-
       devspace run manifest
-      run_dependencies --all --pipeline build
       build_images --all --skip-push
   push:
     run: |-
       devspace run manifest
-      run_dependencies --all --pipeline push
       build_images --all
 
 # This is a list of `images` that DevSpace can build for this project
@@ -91,9 +87,12 @@ commands:
       make manifests
       echo kustomizing
       kustomize build config/default | gojq --yaml-input -s > ../environments/default/kustomized.json
+      devspace run jsonnet
+  jsonnet:
+    command: |-
       cd ../environments
-      echo running jsonnet
       gitVer=$(git describe --always --dirty)
+      echo running jsonnet with git version $gitVer
       jsonnet --yaml-stream -J vendor -J lib --ext-str gitVer=$gitVer default/disk8s.jsonnet  > default/disk8s.yaml
       echo manifest updated at default/disk8s.yaml
 

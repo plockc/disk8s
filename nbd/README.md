@@ -8,6 +8,12 @@ I used [lima](https://github.com/lima-vm/lima) (used by Rancher Desktop) running
 
 ```
 brew install lima
+
+cat > ~/.lima/_config/default.yaml <<EOF
+cpus: 1
+memory: 1GiB
+EOF
+
 lima start --name=alpine template://alpine
 lima shell alpine
 apk add go

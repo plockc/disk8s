@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	disk8sv1alpha1 "github.com/plockc/disk8s/disk8s-controller/api/v1alpha1"
-	"github.com/plockc/disk8s/disk8s-controller/controllers"
+	disk8sv1alpha1 "github.com/plockc/disk8s/controller/api/v1alpha1"
+	"github.com/plockc/disk8s/controller/controllers"
 	//+kubebuilder:scaffold:imports
 )
 

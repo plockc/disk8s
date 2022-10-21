@@ -1,4 +1,4 @@
-module github.com/plockc/disk8s/disk8s-controller
+module github.com/plockc/disk8s/controller
 
 go 1.18
 

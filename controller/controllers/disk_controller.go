@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	disk8sv1alpha1 "github.com/plockc/disk8s/disk8s-controller/api/v1alpha1"
+	disk8sv1alpha1 "github.com/plockc/disk8s/controller/api/v1alpha1"
 )
 
 const (
@@ -42,8 +42,13 @@ const (
 var gitVersionLdFlag string
 
 func init() {
-	if gitVersionLdFlag == "" {
-		gitVersionLdFlag = "latest"
+	if os.Getenv("GIT_VERSION") == "" {
+		// if there was an ldflag to set the version, then we'll use it, else use "latest"
+		if gitVersionLdFlag == "" {
+			gitVersionLdFlag = "latest"
+		}
+	} else {
+		gitVersionLdFlag = os.Getenv("GIT_VERSION")
 	}
 	fmt.Println("Using container image tag " + gitVersionLdFlag)
 }
