@@ -27,11 +27,11 @@ pipelines:
   push:
     run: |-
       echo Checking git
-      git diff --quiet || { echo Workspace is dirty && exit 1; }
+      git diff --quiet ':!../environments/default/disk8s.yaml' || { echo Workspace is dirty && exit 1; }
       # test that it works first
       run_dependency_pipelines --pipeline build-all nbd
       build_images --all --skip-push
-      # now push, the manifest will cause workspace to be dirty, idea is to get everything committed except the manifest before push
+      # looks good, build manifest and push
       devspace run manifest
       build_images --all
       run_dependency_pipelines --pipeline push nbd
@@ -43,10 +43,10 @@ images:
     image: plockc/disk8s-controller:latest
     tags:
       - latest
-      - $(git describe --always --dirty)
+      - $(git describe --always)
     dockerfile: ./Dockerfile
     buildArgs:
-      GIT_VERSION: $(git describe --always --dirty)
+      GIT_VERSION: $(git describe --always)
 
 # This is a list of `deployments` that DevSpace can create for this project
 deployments:

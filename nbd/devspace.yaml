@@ -28,13 +28,11 @@ pipelines:
       run_dependency_pipelines --pipeline protobuf replica
   push:
     run: |-
-      git diff --quiet || echo Workspace is dirty && exit 1
       # check it compiles first
-      devspace run protobuf
+      run_pipelines build
+      git diff --quiet ':!../environments/default/disk8s.yaml' || { echo Workspace is dirty && exit 1; }
       run_dependency_pipelines --pipeline build replica
-      build_images --all --skip-push
-      # start pushing
-      git diff --quiet || echo Workspace is dirty && exit 1
+      # looks good, start pushing dependencies then self
       run_dependency_pipelines --pipeline push replica
       build_images --all
 

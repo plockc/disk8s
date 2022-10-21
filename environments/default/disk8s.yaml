@@ -473,10 +473,10 @@
                      },
                      {
                         "name": "GIT_VERSION",
-                        "value": "3b68d73"
+                        "value": "be0afe6"
                      }
                   ],
-                  "image": "plockc/disk8s-controller:3b68d73",
+                  "image": "plockc/disk8s-controller:be0afe6",
                   "imagePullPolicy": "IfNotPresent",
                   "livenessProbe": {
                      "httpGet": {
