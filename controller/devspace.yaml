@@ -32,10 +32,14 @@ pipelines:
       # using a separate exec call to avoid caching that build_images already ran
       #devspace run-pipeline build-all
       devspace run manifest
+      echo ====== controller ===== manifest ran, about to run build-all child
       run_dependency_pipelines --pipeline build-all nbd
+      echo ====== controller ===== build-all child donw, about to build images====
       # looks good, build manifest and push
       build_images --all
+      echo ====== controller ===== built images and pushed now pushing children
       run_dependency_pipelines --pipeline push nbd
+      echo ====== controller ===== children should have pushed
       git add ../environments/default/disk8s.yaml
       git commit -m "bumped manifest to $(devspace run version)"
       git push
@@ -49,8 +53,6 @@ images:
       - latest
       - $(devspace run version)
     dockerfile: ./Dockerfile
-    buildArgs:
-      GIT_VERSION: $(devspace run version)
 
 # This is a list of `deployments` that DevSpace can create for this project
 deployments:

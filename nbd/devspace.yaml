@@ -28,6 +28,7 @@ pipelines:
       run_dependency_pipelines --pipeline protobuf replica
   push:
     run: |-
+      echo ==== HAHAHAH NBD in da house ====
       # check it compiles first
       run_pipelines build-all
       echo ======= finished building NBD, now push
