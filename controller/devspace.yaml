@@ -31,12 +31,14 @@ pipelines:
       # test that it works first
       # using a separate exec call to avoid caching that build_images already ran
       #devspace run-pipeline build-all
-      run_dependency_pipelines --pipeline build-all nbd
-      build_images --all --skip-push
-      # looks good, build manifest and push
-      build_images --all --force-rebuild
       devspace run manifest
+      run_dependency_pipelines --pipeline build-all nbd
+      # looks good, build manifest and push
+      build_images --all
       run_dependency_pipelines --pipeline push nbd
+      git add ../environments/default/disk8s.yaml
+      git commit -m "bumped manifest to $(devspace run version)"
+      git push
 
 # This is a list of `images` that DevSpace can build for this project
 # We recommend to skip image building during development (devspace dev) as much as possible

@@ -29,12 +29,14 @@ pipelines:
   push:
     run: |-
       # check it compiles first
-      run_pipelines build
+      run_pipelines build-all
+      echo finished build
       git diff --quiet ':!../environments/default/disk8s.yaml' || { echo Workspace is dirty && exit 1; }
+      echo not dirty, build replica
       run_dependency_pipelines --pipeline build replica
       # looks good, start pushing dependencies then self
-      run_dependency_pipelines --pipeline push replica
       build_images --all --force-rebuild
+      run_dependency_pipelines --pipeline push replica
 
 # This is a list of `images` that DevSpace can build for this project
 # We recommend to skip image building during development (devspace dev) as much as possible

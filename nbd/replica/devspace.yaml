@@ -26,7 +26,7 @@ pipelines:
     run: |-
       devspace run protobuf
       git diff --quiet ':!../environments/default/disk8s.yaml' || { echo Workspace is dirty && exit 1; }
-      build_images --all
+      build_images --all --force-rebuild
 
 # This is a list of `images` that DevSpace can build for this project
 # We recommend to skip image building during development (devspace dev) as much as possible

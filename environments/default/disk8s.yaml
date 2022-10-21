@@ -473,10 +473,10 @@
                      },
                      {
                         "name": "GIT_VERSION",
-                        "value": "1c96861-dev"
+                        "value": "d85c1fe"
                      }
                   ],
-                  "image": "plockc/disk8s-controller:1c96861-dev",
+                  "image": "plockc/disk8s-controller:d85c1fe",
                   "imagePullPolicy": "IfNotPresent",
                   "livenessProbe": {
                      "httpGet": {
