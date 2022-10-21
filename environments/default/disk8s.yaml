@@ -473,10 +473,10 @@
                      },
                      {
                         "name": "GIT_VERSION",
-                        "value": "eddb25d"
+                        "value": "b6b4100-dirty"
                      }
                   ],
-                  "image": "plockc/disk8s-controller:eddb25d",
+                  "image": "plockc/disk8s-controller:b6b4100-dirty",
                   "imagePullPolicy": "IfNotPresent",
                   "livenessProbe": {
                      "httpGet": {

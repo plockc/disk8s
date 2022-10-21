@@ -26,13 +26,14 @@ pipelines:
       build_images --all --skip-push
   push:
     run: |-
-      git diff --quiet || echo Workspace is dirty, cannot push && exit 1
+      echo Checking git
+      git diff --quiet || echo Workspace is dirty && exit 1
       # test that it works first
       devspace run manifest
       run_dependency_pipelines --pipeline build-all nbd
       build_images --all --skip-push
       # now push
-      git diff --quiet || echo Workspace is dirty, cannot push && exit 1
+      git diff --quiet || echo Workspace is dirty && exit 1
       build_images --all
       run_dependency_pipelines --pipeline push nbd
 

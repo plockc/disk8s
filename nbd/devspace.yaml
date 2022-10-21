@@ -28,13 +28,13 @@ pipelines:
       run_dependency_pipelines --pipeline protobuf replica
   push:
     run: |-
-      git diff --quiet || echo Workspace is dirty, cannot push && exit 1
+      git diff --quiet || echo Workspace is dirty && exit 1
       # check it compiles first
       devspace run protobuf
       run_dependency_pipelines --pipeline build replica
       build_images --all --skip-push
       # start pushing
-      git diff --quiet || echo Workspace is dirty, cannot push && exit 1
+      git diff --quiet || echo Workspace is dirty && exit 1
       run_dependency_pipelines --pipeline push replica
       build_images --all
 
