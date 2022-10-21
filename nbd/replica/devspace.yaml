@@ -1,6 +1,9 @@
 version: v2beta1
 name: replicagit
 
+imports:
+  - path: ../../devspace-commands.yaml
+
 # This is a list of `pipelines` that DevSpace can execute (you can define your own)
 pipelines:
   # This is the pipeline for the main command: `devspace dev` (or `devspace run-pipeline dev`)
@@ -17,15 +20,12 @@ pipelines:
   # You can run this pipeline via `devspace build` (or `devspace run-pipeline build`)
   build:
     run: |-
-      run_pipelines protobuf
-      build_images --all --skip-push
-  protobuf:
-    run: |-
       devspace run protobuf
+      build_images --all --skip-push
   push:
     run: |-
-      devspace run protobuf
-      git diff --quiet ':!../environments/default/disk8s.yaml' || { echo Workspace is dirty && exit 1; }
+      run_pipelines build
+      devspace run verify-clean
       build_images --all --force-rebuild
 
 # This is a list of `images` that DevSpace can build for this project
@@ -69,13 +69,3 @@ dev:
     # Forward the following ports to be able access your application via localhost
     ports:
       - port: "10808"
-
-# Use the `commands` section to define repeatable dev workflows for this project 
-commands:
-  version:
-    command: |-
-      git diff --quiet ':!../environments/default/disk8s.yaml' && git describe --always || echo $(git describe --always)-dev
-  protobuf:
-    command: |-
-      mkdir -p ./pb
-      protoc --go_out=./pb --go_opt=paths=source_relative --go-grpc_opt=paths=source_relative --go-grpc_out=./pb data-disk.proto

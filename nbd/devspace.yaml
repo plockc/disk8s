@@ -1,6 +1,9 @@
 version: v2beta1
 name: nbdgit
 
+imports:
+  - path: ../devspace-commands.yaml
+
 # This is a list of `pipelines` that DevSpace can execute (you can define your own)
 pipelines:
   # This is the pipeline for the main command: `devspace dev` (or `devspace run-pipeline dev`)
@@ -16,25 +19,21 @@ pipelines:
       run_pipelines build
   build:
     run: |-
-      run_pipelines protobuf
+      devspace run replica.protobuf
       build_images --all --skip-push
   build-all:
     run: |-
       run_dependency_pipelines --pipeline build replica
       run_pipelines build
-  protobuf:
-    run: |-
-      run_dependency_pipelines --pipeline protobuf replica
   push:
     run: |-
       echo ==== HAHAHAH NBD in da house ====
       # check it compiles first
       run_pipelines build
-      echo ======= finished building NBD, now push
+      echo ======= finished building NBD, now push CHILD
       # looks good, start pushing dependencies then self
       run_dependency_pipelines --pipeline push replica
       build_images --all --force-rebuild
-      echo ======= finished pushing NBD, now push CHILD
 
 # This is a list of `images` that DevSpace can build for this project
 # We recommend to skip image building during development (devspace dev) as much as possible
@@ -75,14 +74,6 @@ dev:
     # Forward the following ports to be able access your application via localhost
     ports:
       - port: "10809"
-
-# Use the `commands` section to define repeatable dev workflows for this project 
-commands:
-  version:
-    command: |-
-      git diff --quiet ':!../environments/default/disk8s.yaml' && git describe --always || echo $(git describe --always)-dev
-  protobuf:
-    command: devspace run-pipeline protobuf
 
 dependencies:
   replica:

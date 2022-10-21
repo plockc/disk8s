@@ -1,0 +1,15 @@
+version: v2beta1
+name: sharedcommands
+
+commands:
+  verify-clean:
+    command: |-
+      git diff --quiet -- ':!/environments/default/disk8s.yaml' || { echo workspace is dirty, commit and try again && exit 1; }
+  version:
+    command: |-
+      # this is a pathspec that starts at root of repo '/' and excludes the given file '!'
+      git diff --quiet -- ':!/environments/default/disk8s.yaml' && git describe --always || echo $(git describe --always)-dev
+  protobuf:
+    command: |-
+      mkdir -p ./pb
+      protoc --go_out=./pb --go_opt=paths=source_relative --go-grpc_opt=paths=source_relative --go-grpc_out=./pb data-disk.proto

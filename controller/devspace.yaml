@@ -1,6 +1,9 @@
 version: v2beta1
 name: disk8sgit
 
+imports:
+  - path: ../devspace-commands.yaml
+
 # This is a list of `pipelines` that DevSpace can execute (you can define your own)
 pipelines:
   # This is the pipeline for the main command: `devspace dev` (or `devspace run-pipeline dev`)
@@ -28,17 +31,13 @@ pipelines:
     run: |-
       # there is a bug where devspace thinks it deployed already even though we are running a pipeline that didn't run before
       echo Checking git
-      git diff --quiet ':!../environments/default/disk8s.yaml' || { echo Workspace is dirty && exit 1; }
+      devspace run verify-clean
       # test that it works first
       # using a separate exec call to avoid caching that build_images already ran
-      #devspace run-pipeline build-all
       devspace run-pipeline build
       # looks good, push children and push self
-      echo ====== controller ===== manifest ran, about to run build-all child
       run_dependency_pipelines --pipeline push nbd
-      echo ====== controller ===== build-all child donw, about to build images====
       build_images --all --force-rebuild
-      echo ====== controller ===== built images and pushed now pushing children
       git add ../environments/default/disk8s.yaml
       git commit -m "bumped manifest to $(devspace run version)"
       git push
