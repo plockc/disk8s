@@ -37,7 +37,7 @@ images:
     context: ../
     tags:
       - latest
-      - $(bash -c "git diff --quiet ':!../environments/default/disk8s.yaml' && git describe --always || echo $(git describe --always)-dev")
+      - $(devspace run version)
 
 # This is a list of `dev` containers that are based on the containers created by your deployments
 dev:
@@ -72,6 +72,9 @@ dev:
 
 # Use the `commands` section to define repeatable dev workflows for this project 
 commands:
+  version:
+    command: |-
+      git diff --quiet ':!../environments/default/disk8s.yaml' && git describe --always || echo $(git describe --always)-dev
   protobuf:
     command: |-
       mkdir -p ./pb

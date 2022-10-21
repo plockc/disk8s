@@ -12,7 +12,7 @@ pipelines:
   # You can run this pipeline via `devspace deploy` (or `devspace run-pipeline deploy`)
   deploy:
     run: |-
-      build_images --skip-push --all -t $(git describe --always)    # 2. Build, tag (git commit hash) and push all images (see "images")
+      build_images --skip-push --all -t $(devspace run version)    # 2. Build, tag (git commit hash) and push all images (see "images")
       create_deployments --all                          # 3. Deploy Helm charts and manifests specfied as "deployments"
       devspace run apply-sample-disk
   build:
@@ -34,8 +34,8 @@ pipelines:
       run_dependency_pipelines --pipeline build-all nbd
       build_images --all --skip-push
       # looks good, build manifest and push
-      devspace run manifest
       build_images --all --force-rebuild
+      devspace run manifest
       run_dependency_pipelines --pipeline push nbd
 
 # This is a list of `images` that DevSpace can build for this project
@@ -45,10 +45,10 @@ images:
     image: plockc/disk8s-controller:latest
     tags:
       - latest
-      - $(bash -c "git diff --quiet ':!../environments/default/disk8s.yaml' && git describe --always || echo $(git describe --always)-dev")
+      - $(devspace run version)
     dockerfile: ./Dockerfile
     buildArgs:
-      GIT_VERSION: $(bash -c "git diff --quiet ':!../environments/default/disk8s.yaml' && git describe --always || echo $(git describe --always)-dev")
+      GIT_VERSION: $(devspace run version)
 
 # This is a list of `deployments` that DevSpace can create for this project
 deployments:
@@ -95,6 +95,9 @@ commands:
   remove-sample-disk:
     command: |-
       kubectl delete -f config/samples/disk.yaml
+  version:
+    command: |-
+      git diff --quiet ':!../environments/default/disk8s.yaml' && git describe --always || echo $(git describe --always)-dev
   manifest:
     command: |-
       make generate
@@ -104,11 +107,11 @@ commands:
       devspace run jsonnet
   jsonnet:
     command: |-
+      gitVer=$(devspace run version)
       cd ../environments
-      gitVer=$(git describe --always --dirty)
       echo running jsonnet with git version $gitVer
       jsonnet --yaml-stream -J vendor -J lib --ext-str gitVer=$gitVer default/disk8s.jsonnet  > default/disk8s.yaml
-      echo manifest updated at default/disk8s.yaml
+      echo manifest updated at environments/default/disk8s.yaml
 
 dependencies:
   nbd:

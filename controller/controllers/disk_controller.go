@@ -42,13 +42,9 @@ const (
 var gitVersionLdFlag string
 
 func init() {
+	gitVersionLdFlag = os.Getenv("GIT_VERSION")
 	if os.Getenv("GIT_VERSION") == "" {
-		// if there was an ldflag to set the version, then we'll use it, else use "latest"
-		if gitVersionLdFlag == "" {
-			gitVersionLdFlag = "latest"
-		}
-	} else {
-		gitVersionLdFlag = os.Getenv("GIT_VERSION")
+		gitVersionLdFlag = "latest"
 	}
 	fmt.Println("Using container image tag " + gitVersionLdFlag)
 }
