@@ -103,9 +103,15 @@ Consider setting up [autoReload](https://www.devspace.sh/docs/5.x/configuration/
 
 Also consider setting up a special devspace manifest with larger runtime memory and CPU limits.
 
-### Updating manifest or RBAC
+### Updating manifest or RBAC when hot-replaced with dev container
 
 Exit the devspace shell, then re-enter
 ```
 devspace dev
 ```
+
+## Image Push and Deploy
+
+docker iamge tags "latest" plus a one with the the <git tag + offset + dirty> is tagged on images via `devspace build` and `devspace run-pipeline push`.  The images in devspace are configured with a dynamic build arg passed to dockerfile based on the current workspace, which then passes to an ldflag which allows the controller to create matching resources.
+
+The controller manifest will be updated as well.

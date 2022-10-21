@@ -18,19 +18,24 @@ pipelines:
   build:
     run: |-
       run_pipelines protobuf
-      build_images --all
+      build_images --all --skip-push
   protobuf:
     run: |-
       devspace run protobuf
+  push:
+    run: |-
+      build_images --all
 
 # This is a list of `images` that DevSpace can build for this project
 # We recommend to skip image building during development (devspace dev) as much as possible
 images:
   app:
     image: plockc/replica:latest
-    skipPush: true
     dockerfile: ../Dockerfile.replica
     context: ../
+    tags:
+      - latest
+      - $(git describe --always --dirty)
 
 # This is a list of `dev` containers that are based on the containers created by your deployments
 dev:

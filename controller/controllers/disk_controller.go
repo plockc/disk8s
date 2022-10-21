@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -37,6 +38,15 @@ const (
 	replicatedDiskPrefix = "nbd-server"
 	replicaDiskPrefix    = "replica"
 )
+
+var gitVersionLdFlag string
+
+func init() {
+	if gitVersionLdFlag == "" {
+		gitVersionLdFlag = "latest"
+	}
+	fmt.Println("Using container image tag " + gitVersionLdFlag)
+}
 
 // DiskReconciler reconciles a Disk object
 type DiskReconciler struct {
@@ -226,7 +236,7 @@ func mutateReplicaStatefulSet(ss *appsv1.StatefulSet, diskName string, size reso
 				Containers: []corev1.Container{
 					{
 						Name:            "disk",
-						Image:           "plockc/replica:latest",
+						Image:           "plockc/replica:" + gitVersionLdFlag,
 						ImagePullPolicy: corev1.PullIfNotPresent,
 						Ports: []corev1.ContainerPort{
 							{
@@ -318,7 +328,7 @@ func mutateNbdServerDeployment(deploy *appsv1.Deployment, diskName, pvcName stri
 				Containers: []corev1.Container{
 					{
 						Name:            "disk",
-						Image:           "plockc/nbd-server:latest",
+						Image:           "plockc/nbd-server:" + gitVersionLdFlag,
 						ImagePullPolicy: corev1.PullIfNotPresent,
 						Env:             []corev1.EnvVar{{Name: "REMOTE_STORAGE", Value: "replica-" + diskName + "-0.replica-sample:10808"}},
 						Ports: []corev1.ContainerPort{

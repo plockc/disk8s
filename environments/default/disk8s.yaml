@@ -472,7 +472,7 @@
                         }
                      }
                   ],
-                  "image": "plockc/disk8s-controller:latest",
+                  "image": "plockc/disk8s-controller:92b4cb2-dirty",
                   "imagePullPolicy": "IfNotPresent",
                   "livenessProbe": {
                      "httpGet": {

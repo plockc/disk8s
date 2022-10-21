@@ -7,7 +7,6 @@ pipelines:
   dev:
     run: |-
       run_dependencies --all       # 1. Deploy any projects this project needs (see "dependencies")
-      make generate
       devspace run manifest
       create_deployments --all     # 2. Deploy Helm charts and manifests specfied as "deployments"
       start_dev app                # 3. Start dev mode "app" (see "dev" section)
@@ -18,14 +17,28 @@ pipelines:
       build_images --all -t $(git describe --always)    # 2. Build, tag (git commit hash) and push all images (see "images")
       create_deployments --all                          # 3. Deploy Helm charts and manifests specfied as "deployments"
       devspace run apply-sample-disk
+  build:
+    run: |-
+      devspace run manifest
+      run_dependencies --all --pipeline build
+      build_images --all --skip-push
+  push:
+    run: |-
+      devspace run manifest
+      run_dependencies --all --pipeline push
+      build_images --all
 
 # This is a list of `images` that DevSpace can build for this project
 # We recommend to skip image building during development (devspace dev) as much as possible
 images:
   app:
     image: plockc/disk8s-controller:latest
+    tags:
+      - latest
+      - $(git describe --always --dirty)
     dockerfile: ./Dockerfile
-    skipPush: true
+    buildArgs:
+      GIT_VERSION: $(git describe --always --dirty)
 
 # This is a list of `deployments` that DevSpace can create for this project
 deployments:
@@ -74,14 +87,16 @@ commands:
       kubectl delete -f config/samples/disk.yaml
   manifest:
     command: |-
+      make generate
       make manifests
       echo kustomizing
       kustomize build config/default | gojq --yaml-input -s > ../environments/default/kustomized.json
       cd ../environments
       echo running jsonnet
-      jsonnet --yaml-stream -J vendor -J lib default/disk8s.jsonnet  > default/disk8s.yaml
+      gitVer=$(git describe --always --dirty)
+      jsonnet --yaml-stream -J vendor -J lib --ext-str gitVer=$gitVer default/disk8s.jsonnet  > default/disk8s.yaml
       echo manifest updated at default/disk8s.yaml
 
 dependencies:
   nbd:
-    path: ./nbd        # Path-based dependencies (for monorepos)
+    path: ../nbd        # Path-based dependencies (for monorepos)
