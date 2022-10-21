@@ -2,7 +2,6 @@
 FROM golang:1.19 as builder
 ARG TARGETOS
 ARG TARGETARCH
-ARG GIT_VERSION
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -22,6 +21,8 @@ COPY controllers/ controllers/
 # was called. For example, if we call make docker-build in a local env which has the Apple Silicon M1 SO
 # the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
+ARG GIT_VERSION
+RUN echo GIT_VERSION=${GIT_VERSION}
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -ldflags "-X github.com/plockc/disk8s/controller/controllers.gitVersionLdFlag=${GIT_VERSION}" -a -o manager main.go
 
 # Use distroless as minimal base image to package the manager binary

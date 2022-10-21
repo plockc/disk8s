@@ -34,7 +34,7 @@ pipelines:
       run_dependency_pipelines --pipeline build replica
       # looks good, start pushing dependencies then self
       run_dependency_pipelines --pipeline push replica
-      build_images --all
+      build_images --all --force-rebuild
 
 # This is a list of `images` that DevSpace can build for this project
 # We recommend to skip image building during development (devspace dev) as much as possible
@@ -44,7 +44,7 @@ images:
     dockerfile: ./Dockerfile
     tags:
       - latest
-      - $(git describe --always --dirty)
+      - $(bash -c "git diff --quiet ':!../environments/default/disk8s.yaml' && git describe --always || echo $(git describe --always)-dev")
 
 # This is a list of `dev` containers that are based on the containers created by your deployments
 dev:

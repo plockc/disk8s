@@ -29,11 +29,13 @@ pipelines:
       echo Checking git
       git diff --quiet ':!../environments/default/disk8s.yaml' || { echo Workspace is dirty && exit 1; }
       # test that it works first
+      # using a separate exec call to avoid caching that build_images already ran
+      #devspace run-pipeline build-all
       run_dependency_pipelines --pipeline build-all nbd
       build_images --all --skip-push
       # looks good, build manifest and push
       devspace run manifest
-      build_images --all
+      build_images --all --force-rebuild
       run_dependency_pipelines --pipeline push nbd
 
 # This is a list of `images` that DevSpace can build for this project
@@ -43,10 +45,10 @@ images:
     image: plockc/disk8s-controller:latest
     tags:
       - latest
-      - $(git describe --always)
+      - $(bash -c "git diff --quiet ':!../environments/default/disk8s.yaml' && git describe --always || echo $(git describe --always)-dev")
     dockerfile: ./Dockerfile
     buildArgs:
-      GIT_VERSION: $(git describe --always)
+      GIT_VERSION: $(bash -c "git diff --quiet ':!../environments/default/disk8s.yaml' && git describe --always || echo $(git describe --always)-dev")
 
 # This is a list of `deployments` that DevSpace can create for this project
 deployments:
