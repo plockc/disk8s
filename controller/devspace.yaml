@@ -29,11 +29,10 @@ pipelines:
       echo Checking git
       git diff --quiet || echo Workspace is dirty && exit 1
       # test that it works first
-      devspace run manifest
       run_dependency_pipelines --pipeline build-all nbd
       build_images --all --skip-push
-      # now push
-      git diff --quiet || echo Workspace is dirty && exit 1
+      # now push, the manifest will cause workspace to be dirty, idea is to get everything committed except the manifest before push
+      devspace run manifest
       build_images --all
       run_dependency_pipelines --pipeline push nbd
 
