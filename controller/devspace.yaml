@@ -38,6 +38,7 @@ pipelines:
       # looks good, build manifest and push
       build_images --all
       echo ====== controller ===== built images and pushed now pushing children
+      # there is a bug where devspace thinks it deployed already even though we are running a pipeline that didn't run before
       run_dependency_pipelines --pipeline push nbd
       echo ====== controller ===== children should have pushed
       git add ../environments/default/disk8s.yaml

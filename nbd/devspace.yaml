@@ -21,8 +21,7 @@ pipelines:
   build-all:
     run: |-
       run_dependency_pipelines --pipeline build replica
-      run_pipelines protobuf
-      build_images --all --skip-push
+      run_pipelines build
   protobuf:
     run: |-
       run_dependency_pipelines --pipeline protobuf replica
@@ -30,12 +29,12 @@ pipelines:
     run: |-
       echo ==== HAHAHAH NBD in da house ====
       # check it compiles first
-      run_pipelines build-all
+      run_pipelines build
       echo ======= finished building NBD, now push
       # looks good, start pushing dependencies then self
+      run_dependency_pipelines --pipeline push replica
       build_images --all --force-rebuild
       echo ======= finished pushing NBD, now push CHILD
-      run_dependency_pipelines --pipeline push replica
 
 # This is a list of `images` that DevSpace can build for this project
 # We recommend to skip image building during development (devspace dev) as much as possible
