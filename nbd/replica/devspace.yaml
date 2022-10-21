@@ -24,6 +24,8 @@ pipelines:
       devspace run protobuf
   push:
     run: |-
+      devspace run protobuf
+      git diff --quiet || echo Workspace is dirty, cannot push && exit 1
       build_images --all
 
 # This is a list of `images` that DevSpace can build for this project

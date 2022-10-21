@@ -12,20 +12,30 @@ pipelines:
   # You can run this pipeline via `devspace deploy` (or `devspace run-pipeline deploy`)
   deploy:
     run: |-
-      run_dependencies --all       # 1. Deploy any projects this project needs (see "dependencies")
       # this container deployed through parent controller, so just build the image so it is ready
       run_pipelines build
   build:
     run: |-
       run_pipelines protobuf
-      run_dependencies --all --pipeline build
+      build_images --all --skip-push
+  build-all:
+    run: |-
+      run_dependency_pipelines --pipeline build replica
+      run_pipelines protobuf
       build_images --all --skip-push
   protobuf:
     run: |-
       run_dependency_pipelines --pipeline protobuf replica
   push:
     run: |-
-      run_dependencies --all --pipeline push
+      git diff --quiet || echo Workspace is dirty, cannot push && exit 1
+      # check it compiles first
+      devspace run protobuf
+      run_dependency_pipelines --pipeline build replica
+      build_images --all --skip-push
+      # start pushing
+      git diff --quiet || echo Workspace is dirty, cannot push && exit 1
+      run_dependency_pipelines --pipeline push replica
       build_images --all
 
 # This is a list of `images` that DevSpace can build for this project

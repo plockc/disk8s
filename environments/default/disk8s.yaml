@@ -473,10 +473,10 @@
                      },
                      {
                         "name": "GIT_VERSION",
-                        "value": "0091bb3-dirty"
+                        "value": "1c2afdd-dirty"
                      }
                   ],
-                  "image": "plockc/disk8s-controller:0091bb3-dirty",
+                  "image": "plockc/disk8s-controller:1c2afdd-dirty",
                   "imagePullPolicy": "IfNotPresent",
                   "livenessProbe": {
                      "httpGet": {

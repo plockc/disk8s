@@ -19,10 +19,22 @@ pipelines:
     run: |-
       devspace run manifest
       build_images --all --skip-push
-  push:
+  build-all:
     run: |-
       devspace run manifest
+      run_dependency_pipelines --pipeline build-all nbd
+      build_images --all --skip-push
+  push:
+    run: |-
+      git diff --quiet || echo Workspace is dirty, cannot push && exit 1
+      # test that it works first
+      devspace run manifest
+      run_dependency_pipelines --pipeline build-all nbd
+      build_images --all --skip-push
+      # now push
+      git diff --quiet || echo Workspace is dirty, cannot push && exit 1
       build_images --all
+      run_dependency_pipelines --pipeline push nbd
 
 # This is a list of `images` that DevSpace can build for this project
 # We recommend to skip image building during development (devspace dev) as much as possible
